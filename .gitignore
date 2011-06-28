@@ -1,0 +1,9 @@
+*~
+*.bak
+
+*.log
+*.gem
+
+pkg/
+doc/
+tmp/
