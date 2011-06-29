@@ -55,6 +55,7 @@ module Castoro::S3Adapter #:nodoc:
       client_conf = {
         "logger"   => @logger,
         "my_host"  => @options[:my_host],
+        "my_ports" => @options[:my_ports],
         "gateways" => @options[:gateways],
       }
       @client      = Castoro::Client.new client_conf

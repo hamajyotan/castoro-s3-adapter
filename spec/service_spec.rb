@@ -88,11 +88,17 @@ describe Castoro::S3Adapter::Service do
       value.should == "hoge.txt\n12345\nABC"
     end
 
+    context "given unknown bucket." do
+      it "should return NoSuchBucket response" do
+        value = AWS::S3::S3Object.value("foo.txt", "1.1.2")
+        value.response.code.should == 404
+      end
+    end
+
     context "given unknown object." do
       it "should return NoSuchKey response" do
         value = AWS::S3::S3Object.value("foo.txt", "1.1.1")
         value.response.code.should == 404
-        value.should == ""
       end
     end
   end

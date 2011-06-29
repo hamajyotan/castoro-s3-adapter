@@ -23,20 +23,19 @@ module Castoro::S3Adapter #:nodoc:
     end
 
     # GET Bucket
-    get "/:bucket/" do |bucket|
-      redirect "/#{bucket}"
-    end
-
-    # GET Bucket
     get "/:bucket" do |bucket|
       @logger.debug { "GET Bucket - #{bucket}" }
       @bucket = bucket
 
-      if (@files = get_files(bucket))
-        builder :get_bucket
+      if (dir = get_basket(bucket))
+        @files = Dir[File.join(dir, "*")].inject({}) { |h, f|
+          h[f] = File.stat(f)
+          h
+        }
+        builder :list_bucket_result
       else
-        builder :get_bucket_404
         status 404
+        builder :no_such_bucket
       end
     end
 
@@ -44,15 +43,20 @@ module Castoro::S3Adapter #:nodoc:
     get "/:bucket/:object" do |bucket, object|
       @logger.debug { "GET Object - #{bucket}, #{object}" }
 
-      if (file = get_file(bucket, object))
-        body File.open(file, "rb") { |f| f.read }
+      if (dir = get_basket(bucket))
+        if (file = get_basket_file(bucket, object))
+          body File.open(file, "rb") { |f| f.read }
+        else
+          status 404
+          builder :no_such_object
+        end       
       else
-        @object = object
-        builder :get_object_404
         status 404
+        builder :no_such_bucket
       end
     end
 
   end
 
 end
+

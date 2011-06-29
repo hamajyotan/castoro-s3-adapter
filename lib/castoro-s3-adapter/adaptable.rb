@@ -10,35 +10,27 @@ module Castoro::S3Adapter #:nodoc:
 
     BASE = "/data"
 
-    def get_files basket
+    def get_basket basket
       res = @client.get basket rescue nil
       return nil unless res
 
-      # TODO: Choice does host that can be used.
-      host, path = nil, nil
-      res.each { |k,v| host, path = k, v }
-
-      fullpath = File.join BASE, host, path
-      Dir[File.join(fullpath, "*")].inject({}) { |h, k|
-        h[k] = File.stat k
-        h
+      res.each { |k, v|
+        fullpath = File.join BASE, k, v
+        return fullpath if File.directory?(fullpath)
       }
+      nil
     end
 
-    def get_file basket, file
+    def get_basket_file basket, file
       res = @client.get basket rescue nil
       return nil unless res
 
-      # TODO: Choice does host that can be used.
-      host, path = nil, nil
-      res.each { |k,v| host, path = k, v }
-
-      fullpath = File.join BASE, host, path, file
-      return nil unless File.exist?(fullpath)
-
-      fullpath
+      res.each { |k, v|
+        fullpath = File.join BASE, k, v, file
+        return fullpath if File.file?(fullpath)
+      }
+      nil
     end
-
   end
 
 end
