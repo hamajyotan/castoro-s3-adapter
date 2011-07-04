@@ -63,19 +63,20 @@ describe Castoro::S3Adapter::Service do
 
   describe "GET Bucket" do
     it "The file that exists in Bucket should be able to enumerate." do
-      objects = AWS::S3::Bucket.objects("1.1.1")
-      objects.each { |o|
-        case o.key
-        when "hoge.txt"; o.size.should == 18
-        when "fuga.txt"; o.size.should == 1
-        else           ; raise "unknown file."
-        end
-      }
+      objects = AWS::S3::Bucket.objects("castoro/?prefix=1.1.1/")
+
+      objects.size.should == 3
+      objects[0].key.should == "1.1.1/"
+      objects[0].size.should == "0"
+      objects[1].key.should == "1.1.1/fuga.txt"
+      objects[1].size.should == 1
+      objects[2].key.should == "1.1.1/hoge.txt"
+      objects[2].size.should == 18
     end
 
     context "given unknown bucket." do
       it "should return NoSuchBucket response" do
-        objects = AWS::S3::Bucket.objects("1.1.2")
+        objects = AWS::S3::Bucket.objects("castoro/?prefix=1.1.2/")
         objects.should == []
       end
     end
@@ -83,21 +84,21 @@ describe Castoro::S3Adapter::Service do
 
   describe "GET Object" do
     it "Object should be able to be downloaded." do
-      value = AWS::S3::S3Object.value("hoge.txt", "1.1.1")
+      value = AWS::S3::S3Object.value("1.1.1/hoge.txt", "castoro")
       value.response.code.should == 200
       value.should == "hoge.txt\n12345\nABC"
     end
 
     context "given unknown bucket." do
       it "should return NoSuchBucket response" do
-        value = AWS::S3::S3Object.value("foo.txt", "1.1.2")
+        value = AWS::S3::S3Object.value("1.1.2/foo.txt", "castoro")
         value.response.code.should == 404
       end
     end
 
     context "given unknown object." do
       it "should return NoSuchKey response" do
-        value = AWS::S3::S3Object.value("foo.txt", "1.1.1")
+        value = AWS::S3::S3Object.value("1.1.1/foo.txt", "castoro")
         value.response.code.should == 404
       end
     end

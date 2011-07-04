@@ -19,6 +19,7 @@ Gem::Specification.new do |s|
   s.files = %w(History.txt LICENSE README.textile Rakefile) + Dir.glob("{bin,setup,lib,resources,spec,config}/**/*")
   s.require_path = "lib"
   s.bindir = "bin"
+  s.authors = ["castoro project"]
 
   s.add_dependency('castoro-client', '>= 0.1.0')
   s.add_dependency('sinatra')

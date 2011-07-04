@@ -18,6 +18,7 @@ module Castoro::S3Adapter #:nodoc:
   class Service
 
     DEFAULT_SETTINGS = {
+      :bucket             => "castoro",
       :logger             => " Proc.new { |logfile| Logger.new(logfile) } ",
       :user               => "castoro",
       :loglevel           => Logger::INFO,
@@ -59,7 +60,7 @@ module Castoro::S3Adapter #:nodoc:
         "gateways" => @options[:gateways],
       }
       @client      = Castoro::Client.new client_conf
-      @dispatcher  = Dispatcher.new @logger, @client
+      @dispatcher  = Dispatcher.new @logger, @client, @options[:bucket]
       @console     = Console.new @logger, @options
       @http_server = HttpServer.new @logger, @dispatcher, @options
 

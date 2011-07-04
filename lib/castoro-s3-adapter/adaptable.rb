@@ -15,7 +15,7 @@ module Castoro::S3Adapter #:nodoc:
       return nil unless res
 
       res.each { |k, v|
-        fullpath = File.join BASE, k, v
+        fullpath = File.join BASE, k, v, "/"
         return fullpath if File.directory?(fullpath)
       }
       nil
