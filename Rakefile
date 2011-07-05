@@ -25,6 +25,8 @@ Gem::Specification.new do |s|
   s.add_dependency('sinatra')
   s.add_dependency('builder')
 
+  s.add_development_dependency('aws-s3')
+
   Rake::GemPackageTask.new(s) do |p|
     p.gem_spec = s
     p.need_tar = true

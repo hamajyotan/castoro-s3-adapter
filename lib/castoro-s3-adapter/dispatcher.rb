@@ -45,57 +45,53 @@ module Castoro::S3Adapter #:nodoc:
         return builder :invalid_argument
       end
 
-      unless @bucket == bucket
+      unless @base_bucket == @bucket
         status 404
         return builder :no_such_bucket
       end
 
       basket, file_prefix = @prefix =~ /^(.+)\/(.*)$/ ? [$1, $2] : [nil, nil]
-      unless basket
-        @files = {}
-        return builder :list_bucket_result
-      end
+      return builder :list_bucket_result unless basket
  
-      unless (dir = get_basket(basket))
-        status 404
-        return builder :no_such_object
-      end
+      dir = get_basket basket
 
-      @contents = []
-      if file_prefix == ""
-        st = File.stat(dir)
-        @contents << {
-          :key => File.join(basket, "/"),
-          :last_modified => st.mtime.utc.iso8601,
-          :etag => nil,
-          :size => 0,
-          :storage_class => "STANDARD",
-        }
-      end
+      @contents =
+        if dir
+          contents = []
+          if file_prefix == ""
+            st = File.stat(dir)
+            contents << {
+              :key => File.join(basket, "/"),
+              :last_modified => st.mtime.utc.iso8601,
+              :etag => sprintf("%x-%x-%x", st.ino, st.size, st.mtime),
+              :size => 0,
+              :storage_class => "STANDARD",
+            }
+          end
 
-      Dir[File.join(dir, "**/*")].select { |f|
-        f =~ /#{dir}#{file_prefix}.*$/
-      }.each { |f|
-        st = File.stat(f)
-        @contents << {
-          :key => File.join(basket, File.basename(f)),
-          :last_modified => st.mtime.utc.iso8601,
-          :etag => nil,
-          :size => st.size,
-          :storage_class => "STANDARD",
-        }
-      }
+          Dir[File.join(dir, "**/*")].select { |f|
+            f =~ /#{dir}#{file_prefix}.*$/
+          }.each { |f|
+            st = File.stat(f)
+            contents << {
+              :key => File.join(basket, File.basename(f)),
+              :last_modified => st.mtime.utc.iso8601,
+              :etag => sprintf("%x-%x-%x", st.ino, st.size, st.mtime),
+              :size => st.size,
+              :storage_class => "STANDARD",
+            }
+          }
+          contents
+        end.to_a
 
-      @contents.sort_by! { |c| c[:key] }
-
-      @common_prefixes = []
-      if @delimiter
-        @common_prefixes = @contents.map { |c|
-          $1 if c[:key] =~ /^(#{@prefix}.*?#{@delimiter}).*$/
-        }.uniq.compact.map { |p|
-          { :prefix => p }
-        }
-      end
+      @common_prefixes =                  
+        if @delimiter
+          @common_prefixes = @contents.map { |c|
+            $1 if c[:key] =~ /^(#{@prefix}.*?#{@delimiter}).*$/
+          }.uniq.compact.map { |p|
+            { :prefix => p }
+          }
+        end.to_a
 
       @contents.reject! { |c|
         @common_prefixes.any? { |p|
@@ -103,7 +99,8 @@ module Castoro::S3Adapter #:nodoc:
         }
       }
 
-      @common_prefixes.sort_by! { |p| p[:prefix] }
+      @contents.sort! { |x, y| x[:key] <=> y[:key] }
+      @common_prefixes.sort! { |x, y| x[:prefix] <=> y[:prefix] }
 
       builder :list_bucket_result
     end
@@ -111,23 +108,21 @@ module Castoro::S3Adapter #:nodoc:
     # GET Object
     get "/:bucket/:basket/:object" do |bucket, basket, object|
       @bucket = bucket
-      @response_content_type        = params["response-content-type"]
-      @response_content_language    = params["response-content-language"]
-      @response_expires             = params["response-expires"]
-      @response_cache_control       = params["response-cache-control"]
-      @response_content_disposition = params["response-content-disposition"]
-      @response_content_encoding    = params["response-content-encoding"]
+      @key    = "#{basket}/#{object}"
 
-      unless @bucket == bucket
+      unless @base_bucket == @bucket
         status 404
         return builder :no_such_bucket
       end
 
       unless (file = get_basket_file(basket, object))
         status 404
-        return builder :no_such_object
+        return builder :no_such_key
       end
 
+      st = File.stat(file)
+      headers "last-modified" => st.mtime.httpdate,
+              "etag" => sprintf("%x-%x-%x", st.ino, st.size, st.mtime)
       body File.open(file, "rb") { |f| f.read }
     end
 
