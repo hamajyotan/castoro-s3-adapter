@@ -59,14 +59,18 @@ describe Castoro::S3Adapter::Service do
 
     # start adapter.
     @l = Logger.new nil
-    @s = Castoro::S3Adapter::Service.new @l
+    @conf = {
+      :port         => ENV["TEST_PORT"]         ? ENV["TEST_PORT"].to_i         : Castoro::S3Adapter::Service::DEFAULT_SETTINGS[:port],
+      :console_port => ENV["TEST_CONSOLE_PORT"] ? ENV["TEST_CONSOLE_PORT"].to_i : Castoro::S3Adapter::Service::DEFAULT_SETTINGS[:console_port],
+    }
+    @s = Castoro::S3Adapter::Service.new @l, @conf
     @s.start
     sleep 1.0
 
     # aws-s3 settings.
     AWS::S3::Base.establish_connection!(
       :server => "127.0.0.1",
-      :port => 8080,
+      :port => @conf[:port],
       :access_key_id => "castoro",
       :secret_access_key => "castoro"
     )
@@ -75,7 +79,7 @@ describe Castoro::S3Adapter::Service do
   describe "net/http access" do
     describe "GET Bucket" do
       it "The file that exists in Bucket should be able to enumerate." do
-        Net::HTTP.start("127.0.0.1", 8080) { |http|
+        Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
           response = http.get("/castoro/?prefix=1.1.1/")
 
           response.code.should == "200"
@@ -108,7 +112,7 @@ describe Castoro::S3Adapter::Service do
       end
 
       it "The file that not exists in Bucket should be ale to null enumerate." do
-        Net::HTTP.start("127.0.0.1", 8080) { |http|
+        Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
           response = http.get("/castoro/?prefix=1.1.2/")
 
           response.code.should == "200"
@@ -124,7 +128,7 @@ describe Castoro::S3Adapter::Service do
   
       context "given unknown bucket." do
         it "should return NoSuchBucket response" do
-          Net::HTTP.start("127.0.0.1", 8080) { |http|
+          Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
             response = http.get("/not_exists_bucket/?prefix=1.1.1/")
   
             response.code.should == "404"
@@ -142,7 +146,7 @@ describe Castoro::S3Adapter::Service do
   
     describe "GET Object" do
       it "Object should be able to be downloaded." do
-        Net::HTTP.start("127.0.0.1", 8080) { |http|
+        Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
           response = http.get("/castoro/1.1.1/hoge.txt")
 
           response.code.should == "200"
@@ -155,7 +159,7 @@ describe Castoro::S3Adapter::Service do
   
       context "given unknown object." do
         it "should return NoSuchKey response" do
-          Net::HTTP.start("127.0.0.1", 8080) { |http|
+          Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
             response = http.get("/castoro/1.1.1/foo.txt")
   
             response.code.should == "404"
@@ -172,7 +176,7 @@ describe Castoro::S3Adapter::Service do
 
       context "given unknown bucket." do
         it "should return NoSuchBucket response" do
-          Net::HTTP.start("127.0.0.1", 8080) { |http|
+          Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
             response = http.get("/not_exists_bucket/1.1.1/foo.txt")
   
             response.code.should == "404"
