@@ -31,6 +31,14 @@ module Castoro::S3Adapter #:nodoc:
       }
       nil
     end
+
+    def delete_basket basket
+      @client.delete basket rescue nil # TODO: Implement exception handling fails to delete the object.
+    end
+
+    def find_basket basket
+      @client.get basket rescue nil
+    end
   end
 
 end

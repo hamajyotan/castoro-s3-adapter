@@ -126,6 +126,58 @@ module Castoro::S3Adapter #:nodoc:
       body File.open(file, "rb") { |f| f.read }
     end
 
+    # DELETE Object(basket)
+    delete "/:bucket/:basket/" do |bucket, basket|
+      @bucket = bucket
+      @key    = "#{basket}"
+
+      unless @base_bucket == @bucket
+        status 404
+        return builder :no_such_bucket
+      end
+
+      unless find_basket(basket)
+        status 204
+        return
+      end
+
+      delete_basket basket
+      status 204
+    end
+
+    # DELETE Object(file in basket)
+    delete "/:bucket/:basket/:object" do |bucket, basket, object|
+      @bucket = bucket
+      @key    = "#{basket}/#{object}"
+
+      unless @base_bucket == @bucket
+        status 404
+        return builder :no_such_bucket
+      end
+
+      unless get_basket_file(basket, object)
+        status 204
+        return
+      end
+
+      status 403
+      builder :access_denied
+    end
+    
+    # DELETE Object(file)
+    delete "/:bucket/:object" do |bucket, object|
+      @bucket = bucket
+      @key    = "#{object}"
+
+      unless @base_bucket == @bucket
+        status 404
+        return builder :no_such_bucket
+      end
+
+      status 403
+      builder :access_denied
+    end
+
   end
 
 end

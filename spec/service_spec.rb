@@ -14,6 +14,7 @@ describe Castoro::S3Adapter::Service do
     FileUtils.mkdir_p File.join(@tmp, "host1", "1.1.1")
     File.open(File.join(@tmp, "host1", "1.1.1", "hoge.txt"), "w") { |f| f.write "hoge.txt\n12345\nABC" }
     File.open(File.join(@tmp, "host1", "1.1.1", "fuga.txt"), "w") { |f| f.write "h" }
+    File.open(File.join(@tmp, "host1", "baz.txt"), "w") { |f|  f.write "baz" }
 
     @file_info = Hash.new { |h, k|
       st = File.stat k
@@ -52,6 +53,11 @@ describe Castoro::S3Adapter::Service do
     @client.stub!(:create).and_return { nil }
     @client.stub!(:create_direct).and_return { nil }
     @client.stub!(:delete).and_return { nil }
+    @client.stub!(:delete).with("1.1.1").and_return {
+      fullpath = File.join(@tmp, "host1", "1.1.1")
+      FileUtils.rm_r fullpath
+      nil
+    }
 
     @client.stub!(:get).with("1.1.1").and_return {
       { "host1" => "1.1.1" }
@@ -191,6 +197,73 @@ describe Castoro::S3Adapter::Service do
         end
       end
     end
+
+    describe "DELETE Object" do
+      it "Object should be able to be delete." do
+        Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
+          response = http.delete("/castoro/1.1.1/")
+
+          response.code.should == "204"
+          response.body.should == nil
+        }
+        
+        Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
+          response2 = http.get("/castoro/1.1.1/hoge.txt")
+          response2.code.should == "404"
+
+          xml = REXML::Document.new response2.body
+          xml.elements["Error/Code"].text.should == "NoSuchKey"
+          xml.elements["Error/Message"].text.should == "The specified key does not exist."
+          xml.elements["Error/Key"].text.should == "1.1.1/hoge.txt"
+          xml.elements["Error/RequestId"].text.should == nil
+          xml.elements["Error/HostId"].text.should == nil
+        }
+      end
+
+      context "given unknown object" do
+        it "should return 204 No Content response" do
+          Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
+            response = http.delete("/castoro/1.1.1/zzz.txt")
+
+            response.code.should == "204"
+            response.body.should == nil
+          }
+        end
+      end
+
+      context "given s3-adapter does yet unsupported object" do
+        it "should return AccessDenied response" do
+          Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
+            response = http.delete("/castoro/1.1.1/hoge.txt")
+
+            response.code.should == "403"
+
+            xml = REXML::Document.new response.body
+            xml.elements["Error/Code"].text.should == "AccessDenied"
+            xml.elements["Error/Message"].text.should == "Access Denied"
+            xml.elements["Error/RequestId"].text.should == nil
+            xml.elements["Error/HostId"].text.should == nil
+          }
+        end
+      end
+        
+      context "given unsupported path" do
+        it "should return AccessDenied response" do
+          Net::HTTP.start("127.0.0.1", @conf[:port]) { |http|
+            response = http.delete("/castoro/foo.txt")
+
+            response.code.should == "403"
+
+            xml = REXML::Document.new response.body
+            xml.elements["Error/Code"].text.should == "AccessDenied"
+            xml.elements["Error/Message"].text.should == "Access Denied"
+            xml.elements["Error/RequestId"].text.should == nil
+            xml.elements["Error/HostId"].text.should == nil
+          }
+        end
+      end
+
+    end
   end
 
   describe "aws/s3 access" do
@@ -236,10 +309,38 @@ describe Castoro::S3Adapter::Service do
         end
       end
     end
+
+    describe "DELETE Object" do
+      it "Object should be able to be delete." do
+        delete = AWS::S3::S3Object.delete("1.1.1/", "castoro")
+        delete.should == true
+      end
+
+      context "given unknown object" do
+        it "should return true response" do
+          delete = AWS::S3::S3Object.delete("1.1.1/foo.txt", "castoro")
+          delete.should == true
+        end
+      end
+      
+      context "given unsupport object" do
+        it "should return false response" do
+          delete = AWS::S3::S3Object.delete("1.1.1/hoge.txt", "castoro")
+          delete.should == false
+        end
+      end
+      
+      context "given s3-adapter does yet unsupported path" do
+        it "should return false response" do
+          delete = AWS::S3::S3Object.delete("baz.txt", "castoro")
+          delete.should == false
+        end
+      end
+    end
+
   end
 
   after do
     @s.stop
   end
 end
-
