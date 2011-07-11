@@ -1,0 +1,9 @@
+#adapter: sqlite3
+#database: db/s3adapter.sqlite3
+#pool: 5
+#timeout: 5000
+
+adapter: mysql
+user: root
+database: s3adapter
+
