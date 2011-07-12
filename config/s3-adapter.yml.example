@@ -1,7 +1,8 @@
 
 development:
   buckets:
-    castoro: 999
+    castoro:
+      basket_type: 999
   castoro-client:
     gateways:
       - gateway01
@@ -9,7 +10,8 @@ development:
 
 test:
   buckets:
-    castoro: 999
+    castoro:
+      basket_type: 999
   castoro-client:
     gateways:
       - gateway01
@@ -17,7 +19,8 @@ test:
 
 production:
   buckets:
-    castoro: 999
+    castoro:
+      basket_type: 999
   castoro-client:
     gateways:
       - gateway01

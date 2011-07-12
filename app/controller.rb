@@ -32,12 +32,12 @@ module S3Adapter
       end 
 
       # check bucket name.
-      unless (basket_type = S3CONFIG["buckets"][@bucket])
+      unless (basket_type = S3CONFIG["buckets"][@bucket]["basket_type"])
         status 404
         return builder(:no_such_bucket)
       end
 
-      objects = S3Object.find(:all, :conditions => [ "path like ?", @prefix + '%' ] )
+      objects = S3Object.find(:all, :conditions => [ "path like ?", @prefix.to_s + '%' ] )
       @contents = objects.map { |o|
         {
           :key => o.path,
@@ -71,7 +71,7 @@ module S3Adapter
       @bucket, @key = bucket, key
 
       # check bucket name.
-      unless (basket_type = S3CONFIG["buckets"][@bucket])
+      unless (basket_type = S3CONFIG["buckets"][@bucket]["basket_type"])
         status 404
         return builder(:no_such_bucket)
       end
@@ -100,7 +100,7 @@ module S3Adapter
       @bucket, @key = bucket, key
 
       # check bucket name.
-      unless (basket_type = S3CONFIG["buckets"][@bucket])
+      unless (basket_type = S3CONFIG["buckets"][@bucket]["basket_type"])
         status 404
         return builder(:no_such_bucket)
       end
@@ -131,7 +131,7 @@ module S3Adapter
       @bucket, @key = bucket, key
 
       # check bucket name.
-      unless (basket_type = S3CONFIG["buckets"][@bucket])
+      unless (basket_type = S3CONFIG["buckets"][@bucket]["basket_type"])
         status 404
         return builder(:no_such_bucket)
       end
