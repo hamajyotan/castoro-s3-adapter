@@ -2,7 +2,6 @@
 Gemfile.lock
 db/*.sqlite3
 log/*.log
-tmp/
 
 config/database.yml
 config/s3-adapter.yml
