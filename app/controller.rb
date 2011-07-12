@@ -1,6 +1,4 @@
 
-require 'sinatra/base'
-
 module S3Adapter
   class Controller < Sinatra::Base
 

@@ -1,9 +1,12 @@
+
 require 'logger'
+require 'yaml'
 
 require 'rubygems'
+require 'sinatra/base'
+require 'builder'
 require 'castoro-client'
 require 'active_record'
-require 'yaml'
 
 # RACK_ENV
 ENV['RACK_ENV'] ||= 'development'

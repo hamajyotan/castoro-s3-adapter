@@ -1,6 +1,4 @@
 
-require 'castoro-client'
-
 module S3Adapter
   module Adapter
   
