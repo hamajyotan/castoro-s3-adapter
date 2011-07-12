@@ -30,7 +30,7 @@ module S3Adapter
       end 
 
       # check bucket name.
-      unless (basket_type = S3CONFIG["buckets"][@bucket]["basket_type"])
+      unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
         status 404
         return builder(:no_such_bucket)
       end
@@ -69,7 +69,7 @@ module S3Adapter
       @bucket, @key = bucket, key
 
       # check bucket name.
-      unless (basket_type = S3CONFIG["buckets"][@bucket]["basket_type"])
+      unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
         status 404
         return builder(:no_such_bucket)
       end
@@ -98,7 +98,7 @@ module S3Adapter
       @bucket, @key = bucket, key
 
       # check bucket name.
-      unless (basket_type = S3CONFIG["buckets"][@bucket]["basket_type"])
+      unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
         status 404
         return builder(:no_such_bucket)
       end
@@ -129,7 +129,7 @@ module S3Adapter
       @bucket, @key = bucket, key
 
       # check bucket name.
-      unless (basket_type = S3CONFIG["buckets"][@bucket]["basket_type"])
+      unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
         status 404
         return builder(:no_such_bucket)
       end
