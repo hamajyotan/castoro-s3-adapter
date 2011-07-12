@@ -4,7 +4,10 @@ require 'sinatra/base'
 module S3Adapter
   class Controller < Sinatra::Base
 
+    set :logging, true
+    set :static, false
     set :views, File.dirname(__FILE__) + "/views"
+    set :lock, true
  
     # GET Bucket
     get %r{^/([\w]+)/?$} do |bucket|

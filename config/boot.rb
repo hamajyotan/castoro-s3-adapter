@@ -38,22 +38,24 @@ end
 $LOAD_PATH << File.expand_path('../../lib/', __FILE__)
 
 # database settings.
-db_config = YAML::load_file('config/database.yml')
+db_config = YAML::load_file('config/database.yml')[ENV['RACK_ENV']]
 ActiveRecord::Base.establish_connection db_config
 ActiveRecord::Base.logger = Logger.new $stdout
 
 # require models
-Dir.glob("app/models/*.rb").each { |model| require model }
+Dir.glob(File.expand_path('../../app/models/*.rb', __FILE__)).each { |model| require model }
 
 # require controller
-require "app/controller"
+require File.expand_path('../../app/controller', __FILE__)
 
 # load configurations.
 default_config = {
-  "bucket" => "castoro",
+  "buckets" => {
+    "castoro" => 999,
+  },
   "castoro-client" => nil,
 }
-S3CONFIG = default_config.merge!(YAML::load_file('config/s3-adapter.yml')).freeze
+S3CONFIG = default_config.merge!(YAML::load_file('config/s3-adapter.yml')[ENV['RACK_ENV']]).freeze
 
 # castoro-client init.
 require "s3-adapter/adapter"

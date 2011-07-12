@@ -1,0 +1,25 @@
+
+development:
+  buckets:
+    castoro: 999
+  castoro-client:
+    gateways:
+      - gateway01
+      - gateway02
+
+test:
+  buckets:
+    castoro: 999
+  castoro-client:
+    gateways:
+      - gateway01
+      - gateway01
+
+production:
+  buckets:
+    castoro: 999
+  castoro-client:
+    gateways:
+      - gateway01
+      - gateway01
+
