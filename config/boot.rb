@@ -56,7 +56,6 @@ default_config = {
 S3CONFIG = default_config.merge!(YAML::load_file('config/s3-adapter.yml')[ENV['RACK_ENV']]).freeze
 
 # database settings.
-db_config = YAML::load_file('config/database.yml')[ENV['RACK_ENV']]
-ActiveRecord::Base.establish_connection db_config
+ActiveRecord::Base.configurations = YAML.load_file('config/database.yml')
 ActiveRecord::Base.logger = Logger.new $stdout
 
