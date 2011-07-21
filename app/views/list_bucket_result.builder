@@ -5,7 +5,7 @@ xml.ListBucketResult :xmlins => "http://s3.amazonaws.com/doc/2006-03-01/" do
   xml.Marker @marker
   xml.MaxKeys @max_keys
   xml.Delimiter @delimiter if @delimiter
-  xml.IsTruncated false
+  xml.IsTruncated @truncated
 
   keys = 0
   @contents.to_a.each { |content|
@@ -15,7 +15,7 @@ xml.ListBucketResult :xmlins => "http://s3.amazonaws.com/doc/2006-03-01/" do
     xml.Contents do
       xml.Key           content[:key]
       xml.LastModified  content[:last_modified]
-      xml.ETag          content[:etag]
+      xml.ETag          """#{content[:etag]}"""
       xml.Size          content[:size]
       xml.StorageClass  content[:storage_class]
     end
