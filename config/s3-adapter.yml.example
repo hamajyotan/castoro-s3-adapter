@@ -4,6 +4,7 @@ development:
     castoro:
       basket_type: 999
   castoro-client:
+    my_host: 127.0.0.1
     gateways:
       - gateway01
       - gateway02
@@ -13,6 +14,7 @@ test:
     castoro:
       basket_type: 999
   castoro-client:
+    my_host: 127.0.0.1
     gateways:
       - gateway01
       - gateway01

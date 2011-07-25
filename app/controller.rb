@@ -154,8 +154,7 @@ module S3Adapter
         return builder(:no_such_key)
       end
 
-      headers "last-modified" => obj.last_modified.httpdate,
-              "etag" => obj.etag
+      headers to_response_headers(obj)
       body File.open(file, "rb") { |f| f.read }
     end
 
