@@ -31,6 +31,7 @@ module S3Adapter
     module_function :delete_basket_file
   
     def put_basket_file basket, io
+      io.rewind
       @@client.create(basket, "class" => :original) { |host, path|
         fullpath = File.join BASE, host, path, S3ADAPTER_FILE
         File.open(fullpath, "wb") { |f| f.write(io.read) }

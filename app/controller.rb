@@ -1,4 +1,6 @@
 
+require 'digest'
+
 module S3Adapter
   class Controller < Sinatra::Base
 
@@ -7,6 +9,10 @@ module S3Adapter
     set :static, false
     set :views, File.dirname(__FILE__) + "/views"
     set :lock, true
+
+    helpers do
+      include S3Adapter::AuthorizationHelper
+    end
 
     # GET Bucket
     get %r{^/([\w]+)/?$} do |bucket|
@@ -222,7 +228,7 @@ module S3Adapter
 
       # create basket to castoro.
       size = 0
-      Adapter.put_basket_file(basket, body) { |readed_size|
+      Adapter.put_basket_file(basket, request.body) { |readed_size|
         size += readed_size
       }
 

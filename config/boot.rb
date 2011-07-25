@@ -37,6 +37,7 @@ end
 
 # add to $LOAD_PATH
 $LOAD_PATH << File.expand_path('../../lib/', __FILE__)
+require 's3-adapter'
 
 # require models
 Dir.glob(File.expand_path('../../app/models/*.rb', __FILE__)).each { |model| require model }
