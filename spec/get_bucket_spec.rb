@@ -18,6 +18,7 @@ describe 'GET Bucket' do
       o.last_modified = "2011-07-21T19:14:36+09:00"
       o.etag = "ea703e7aa1efda0064eaa507d9e8ab7e"
       o.size = 4
+      o.content_type = "application/octet-stream"
       o.save
     }
     S3Object.new { |o|
@@ -28,6 +29,7 @@ describe 'GET Bucket' do
       o.last_modified = "2011-07-22T21:23:41+09:00"
       o.etag = "73feffa4b7f6bb68e44cf984c85f6e88"
       o.size = 3
+      o.content_type = "image/jpeg"
       o.save
     }
     S3Object.new { |o|
@@ -38,6 +40,7 @@ describe 'GET Bucket' do
       o.last_modified = "2011-07-22T22:22:59+09:00"
       o.etag = "8059cabc22e766aea3c60ce67a82075e"
       o.size = 8
+      o.content_type = "image/gif"
       o.save
     }
   end

@@ -12,6 +12,70 @@ module S3Adapter
 
     helpers do
       include S3Adapter::AuthorizationHelper
+
+      def get_object basket, key
+        modified_since   = Time.httpdate(env["HTTP_IF_MODIFIED_SINCE"]) rescue nil
+        unmodified_since = Time.httpdate(env["HTTP_IF_UNMODIFIED_SINCE"]) rescue nil
+  
+        # check bucket name.
+        unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
+          return 404, {}, builder(:no_such_bucket)
+        end
+  
+        # get basket from database.
+        unless (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
+          return 404, {}, builder(:no_such_key)
+        end
+  
+        # get file from castoro.
+        unless (file = Adapter.get_basket_file(obj.to_basket))
+          return 404, {}, builder(:no_such_key)
+        end
+  
+        # check if_unmodified_since
+        if unmodified_since and unmodified_since < obj.last_modified
+          return 412, {}
+        end
+  
+        # check if_match
+        if env["HTTP_IF_MATCH"] and obj.etag != env["HTTP_IF_MATCH"].gsub("\"", "")
+          return 412, {}
+        end
+
+        if env["HTTP_RANGE"] =~ /^bytes=(\d*)-(\d*)$/
+          first, last = ($1.empty? ? 0 : $1.to_i), ($2.empty? ? obj.size-1 : $2.to_i)
+          if obj.size <= first
+            @message = "The requested range is not satisfiable"
+            @actual_object_size = obj.size
+            @range_requested = env["HTTP_RANGE"]
+            return 416, {}, builder(:invalid_range)
+          end
+        end
+
+        hs = {
+          "last-modified" => obj.last_modified.httpdate,
+          "etag" => obj.etag,
+          "accept-ranges" => "bytes",
+          "content-type" => obj.content_type,
+        }
+  
+        # check if_none_match
+        if env["HTTP_IF_NONE_MATCH"] and obj.etag == env["HTTP_IF_NONE_MATCH"].gsub("\"", "")
+          return 304, hs, nil
+        end
+        
+        # check if_modified_since
+        if modified_since and obj.last_modified <= modified_since
+          return 304, hs, nil
+        end
+
+        if first or last
+          hs["content-range"] = "bytes #{first}-#{last}/#{obj.size}"
+          return 206, hs, File.open(file, "rb") { |f| f.pos = first; f.read(last-first+1) }
+        else
+          return 200, hs, File.open(file, "rb") { |f| f.read }
+        end
+      end
     end
 
     # GET Bucket
@@ -80,82 +144,21 @@ module S3Adapter
     # response body is nil.
     head %r{^/(.*?)/(.+)$} do |bucket, key|
       @bucket, @key = bucket, key
-      modified_since   = Time.httpdate(env["HTTP_IF_MODIFIED_SINCE"]) rescue nil
-      unmodified_since = Time.httpdate(env["HTTP_IF_UNMODIFIED_SINCE"]) rescue nil
+      s, h, b = get_object bucket, key
 
-      # check bucket name.
-      unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
-        status 404
-        return nil 
-      end
-
-      # get basket from database.
-      unless (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
-        status 404
-        return nil
-      end
-
-      # check if_unmodified_since
-      if unmodified_since and unmodified_since < obj.last_modified
-        status 412
-        return nil
-      end
-
-      # check if_match
-      if env["HTTP_IF_MATCH"] and obj.etag != env["HTTP_IF_MATCH"].gsub("\"", "")
-        status 412
-        return nil
-      end
-
-      # check if_none_match
-      if env["HTTP_IF_NONE_MATCH"] and obj.etag == env["HTTP_IF_NONE_MATCH"].gsub("\"", "")
-        status 304
-        headers to_response_headers(obj)
-        return nil
-      end
-      
-      # TODO: implement the behavior of the range header.
-      # check range
-      #if env["HTTP_RANGE"] 
-      #end
-
-      # check if_modified_since
-      if modified_since and obj.last_modified <= modified_since
-        status 304
-        headers to_response_headers(obj)
-        return nil
-      end
-      
-      status 200
-      headers to_response_headers(obj)
-      nil
+      status s
+      headers h
+      body nil
     end
 
     # GET Object
     get %r{^/(.*?)/(.+)$} do |bucket, key|
       @bucket, @key = bucket, key
+      s, h, b = get_object bucket, key
 
-      # check bucket name.
-      unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
-        status 404
-        return builder(:no_such_bucket)
-      end
-
-      # get basket from database.
-      unless (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
-        status 404
-        return builder(:no_such_key)
-      end
-      basket = obj.to_basket
-
-      # get file from castoro.
-      unless (file = Adapter.get_basket_file(basket))
-        status 404
-        return builder(:no_such_key)
-      end
-
-      headers to_response_headers(obj)
-      body File.open(file, "rb") { |f| f.read }
+      status s
+      headers h
+      body b
     end
 
     # DELETE Object
@@ -211,6 +214,7 @@ module S3Adapter
         obj.last_modified = last_modified
         obj.etag = etag
         obj.size = size
+        obj.content_type = request.media_type
       else
         obj = S3Object.create { |o|
           o.basket_type = basket_type
@@ -220,6 +224,7 @@ module S3Adapter
           o.last_modified = last_modified
           o.etag = etag
           o.size = size
+          o.content_type = request.media_type
         }
       end
       obj.save
