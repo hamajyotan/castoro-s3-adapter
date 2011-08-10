@@ -110,7 +110,7 @@ module S3Adapter
       @contents = objects.map { |o|
         {
           :key => o.path,
-          :last_modified => o.last_modified.iso8601,
+          :last_modified => o.last_modified,
           :etag => o.etag,
           :size => o.size,
           :storage_class => "STANDARD",
@@ -219,7 +219,6 @@ module S3Adapter
         obj = S3Object.create { |o|
           o.basket_type = basket_type
           o.path = key
-          o.basket_id = o.next_basket_id(basket_type)
           o.basket_rev = 1
           o.last_modified = last_modified
           o.etag = etag

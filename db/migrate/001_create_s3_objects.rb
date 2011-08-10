@@ -5,12 +5,8 @@ class CreateS3Objects < ActiveRecord::Migration
       t.column :lock_version , :integer , :null => false, :default => 0
       t.column :basket_type  , :integer , :null => false
       t.column :path         , :string  , :null => false
-      t.column :basket_id    , :integer , :null => false
       t.column :basket_rev   , :integer , :null => false, :default => 1
-      t.column :last_modified, :datetime, :null => false
-      t.column :etag         , :string  , :null => false
-      t.column :size         , :integer , :null => false
-      t.column :content_type , :string  , :null => false
+      t.column :object       , :blob
     end
     add_index :s3_objects, [:basket_type, :path], :unique => true
   end

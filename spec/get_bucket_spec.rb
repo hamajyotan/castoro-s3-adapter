@@ -13,7 +13,7 @@ describe 'GET Bucket' do
     S3Object.new { |o|
       o.basket_type = 999
       o.path = "foo/bar/baz.txt"
-      o.basket_id = 1
+      o.id = 1
       o.basket_rev = 1
       o.last_modified = "2011-07-21T19:14:36+09:00"
       o.etag = "ea703e7aa1efda0064eaa507d9e8ab7e"
@@ -24,7 +24,7 @@ describe 'GET Bucket' do
     S3Object.new { |o|
       o.basket_type = 999
       o.path = "hoge/fuga.jpg"
-      o.basket_id = 2
+      o.id = 2
       o.basket_rev = 3
       o.last_modified = "2011-07-22T21:23:41+09:00"
       o.etag = "73feffa4b7f6bb68e44cf984c85f6e88"
@@ -35,7 +35,7 @@ describe 'GET Bucket' do
     S3Object.new { |o|
       o.basket_type = 999
       o.path = "hoge/piyo.gif"
-      o.basket_id = 3
+      o.id = 3
       o.basket_rev = 2
       o.last_modified = "2011-07-22T22:22:59+09:00"
       o.etag = "8059cabc22e766aea3c60ce67a82075e"
@@ -48,7 +48,7 @@ describe 'GET Bucket' do
   context 'given valid bucketname' do
     it 'should return object-list' do
       get '/castoro/'
-  
+
       last_response.should be_ok
       xml = REXML::Document.new last_response.body
       xml.elements["ListBucketResult/Name"].text.should == "castoro"
