@@ -2,7 +2,7 @@
 module S3Adapter
   module Adapter
   
-    BASE = "/data".freeze
+    BASE = "/data"
     S3ADAPTER_FILE = "original".freeze
   
     def init

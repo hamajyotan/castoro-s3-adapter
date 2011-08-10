@@ -13,33 +13,50 @@ module S3Adapter
     helpers do
       include S3Adapter::AuthorizationHelper
 
+      ##
+      # adopt_first_query_string
+      #
+      # If there are parameters of the same name, using the first specified value.
+      def adopt_first_query_string
+        request.query_string.split("&").inject({}) { |h,q|
+          k, v = q.split("=", 2)
+          h[k] = v unless h.include?(k)
+          h
+        }
+      end
+
       def get_object basket, key
         modified_since   = Time.httpdate(env["HTTP_IF_MODIFIED_SINCE"]) rescue nil
         unmodified_since = Time.httpdate(env["HTTP_IF_UNMODIFIED_SINCE"]) rescue nil
-  
+        params = adopt_first_query_string
+
         # check bucket name.
         unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
           return 404, {}, builder(:no_such_bucket)
         end
-  
+
         # get basket from database.
         unless (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
           return 404, {}, builder(:no_such_key)
         end
-  
+
+        last_modified = Time.parse(obj.last_modified)
+
         # get file from castoro.
         unless (file = Adapter.get_basket_file(obj.to_basket))
           return 404, {}, builder(:no_such_key)
         end
-  
+
         # check if_unmodified_since
-        if unmodified_since and unmodified_since < obj.last_modified
-          return 412, {}
+        if unmodified_since and unmodified_since < last_modified
+          @condition = 'If-Unmodified-Since'
+          return 412, {}, builder(:precondition_failed)
         end
-  
+
         # check if_match
         if env["HTTP_IF_MATCH"] and obj.etag != env["HTTP_IF_MATCH"].gsub("\"", "")
-          return 412, {}
+          @condition = 'If-Match'
+          return 412, {}, builder(:precondition_failed)
         end
 
         if env["HTTP_RANGE"] =~ /^bytes=(\d*)-(\d*)$/
@@ -53,29 +70,40 @@ module S3Adapter
         end
 
         hs = {
-          "last-modified" => obj.last_modified.httpdate,
+          "last-modified" => last_modified.httpdate,
           "etag" => obj.etag,
           "accept-ranges" => "bytes",
           "content-type" => obj.content_type,
         }
-  
-        # check if_none_match
-        if env["HTTP_IF_NONE_MATCH"] and obj.etag == env["HTTP_IF_NONE_MATCH"].gsub("\"", "")
+
+        [
+          "response-content-type",
+          "response-content-language",
+          "response-expires",
+          "response-cache-control",
+          "response-content-disposition",
+          "response-content-encoding"
+        ].each { |h|
+          hs[h.sub("response-", "")] = params[h] if params[h]
+        }
+
+        # check if_none_match and if_modified_since
+        if env["HTTP_IF_NONE_MATCH"] and modified_since
+          return 304, hs, nil if obj.etag == env["HTTP_IF_NONE_MATCH"].gsub("\"", "") and last_modified <= modified_since
+        elsif env["HTTP_IF_NONE_MATCH"] and obj.etag == env["HTTP_IF_NONE_MATCH"].gsub("\"", "")
           return 304, hs, nil
-        end
-        
-        # check if_modified_since
-        if modified_since and obj.last_modified <= modified_since
+        elsif modified_since and last_modified <= modified_since
           return 304, hs, nil
         end
 
         if first or last
-          hs["content-range"] = "bytes #{first}-#{last}/#{obj.size}"
+          hs["content-range"] = last < obj.size-1 ? "bytes #{first}-#{last}/#{obj.size}" : "bytes #{first}-#{obj.size-1}/#{obj.size}"
           return 206, hs, File.open(file, "rb") { |f| f.pos = first; f.read(last-first+1) }
         else
           return 200, hs, File.open(file, "rb") { |f| f.read }
         end
       end
+
     end
 
     # GET Bucket
@@ -91,14 +119,14 @@ module S3Adapter
         @argument_value = @max_keys
         @argument_name = "max-keys"
         return builder(:invalid_argument)
-      end 
+      end
       @max_keys = @max_keys.to_i
       unless (0..2147483647).include? @max_keys
         @message = "Argument maxKeys must be an integer between 0 and 2147483647"
         @argument_value = @max_keys
         @argument_name = "maxKeys"
         return builder(:invalid_argument)
-      end 
+      end
 
       # check bucket name.
       unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
@@ -117,7 +145,7 @@ module S3Adapter
         }
       }
 
-      @common_prefixes =                  
+      @common_prefixes =
         if @delimiter
           @common_prefixes = @contents.map { |c|
             $1 if c[:key] =~ /^(#{@prefix}.*?#{@delimiter}).*$/
@@ -206,8 +234,8 @@ module S3Adapter
       last_modified = Time.now.utc.iso8601
       body = request.body.read
       etag = Digest::MD5.hexdigest(body)
-      size = request.body.size
-     
+      size = body.size
+
       # get and create basket from database.
       if (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
         obj.basket_rev += 1
@@ -237,15 +265,6 @@ module S3Adapter
 
       status 200
       nil
-    end
-
-    private
-
-    def to_response_headers metadata
-      {
-        "last-modified" => metadata.last_modified.httpdate,
-        "etag" => metadata.etag
-      }
     end
 
   end
