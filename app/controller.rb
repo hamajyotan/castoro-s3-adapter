@@ -134,7 +134,10 @@ module S3Adapter
         return builder(:no_such_bucket)
       end
 
-      objects = S3Object.find(:all, :conditions => [ "path like ?", @prefix.to_s + '%' ] )
+      cs = []
+      cs << "path like :prefix" unless @prefix.to_s.empty?
+      cs << "path > :marker" unless @marker.to_s.empty?
+      objects = S3Object.find(:all, :conditions => [cs.join(" and "), :prefix => @prefix.to_s + '%', :marker => @marker.to_s])
       @contents = objects.map { |o|
         {
           :key => o.path,
@@ -160,10 +163,17 @@ module S3Adapter
         }
       }
 
+      if @truncated = (@contents.size + @common_prefixes.size) > @max_keys
+        @next_marker = (
+          @contents.map { |c| c[:key ] } + @common_prefixes.map { |p| p[:prefix] }
+        ).sort[@max_keys - 1]
+
+        @contents.reject! { |c| @next_marker < c[:key] }
+        @common_prefixes.reject! { |p| @next_marker < p[:prefix] }
+      end
+
       @contents.sort! { |x, y| x[:key] <=> y[:key] }
       @common_prefixes.sort! { |x, y| x[:prefix] <=> y[:prefix] }
-
-      @truncated = (@contents.size + @common_prefixes.size) > @max_keys
 
       builder(:list_bucket_result)
     end

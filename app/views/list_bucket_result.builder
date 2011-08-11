@@ -4,6 +4,7 @@ xml.ListBucketResult :xmlins => "http://s3.amazonaws.com/doc/2006-03-01/" do
   xml.Prefix @prefix
   xml.Marker @marker
   xml.MaxKeys @max_keys
+  xml.NextMarker @next_marker if @next_marker
   xml.Delimiter @delimiter if @delimiter
   xml.IsTruncated @truncated
 
