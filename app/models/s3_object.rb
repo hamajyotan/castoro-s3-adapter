@@ -33,5 +33,8 @@ class S3Object < ActiveRecord::Base
     self.object = metadata.to_json
   end
 
+  named_scope :active, :conditions => { :deleted => false }
+  named_scope :inactive, :conditions => { :deleted => true }
+
 end
 

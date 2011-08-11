@@ -36,7 +36,7 @@ module S3Adapter
         end
 
         # get basket from database.
-        unless (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
+        unless (obj = S3Object.active.find_by_basket_type_and_path(basket_type, key))
           return 404, {}, builder(:no_such_key)
         end
 
@@ -137,7 +137,7 @@ module S3Adapter
       cs = []
       cs << "path like :prefix" unless @prefix.to_s.empty?
       cs << "path > :marker" unless @marker.to_s.empty?
-      objects = S3Object.find(:all, :conditions => [cs.join(" and "), :prefix => @prefix.to_s + '%', :marker => @marker.to_s])
+      objects = S3Object.active.find(:all, :conditions => [cs.join(" and "), :prefix => @prefix.to_s + '%', :marker => @marker.to_s])
       @contents = objects.map { |o|
         {
           :key => o.path,
@@ -210,7 +210,7 @@ module S3Adapter
       end
 
       # get basket from database.
-      unless (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
+      unless (obj = S3Object.active.find_by_basket_type_and_path(basket_type, key))
         status 204
         return nil
       end
@@ -224,7 +224,9 @@ module S3Adapter
 
       # delete basket and database.
       Adapter.delete_basket_file basket
-      obj.destroy
+      obj.deleted = true
+      obj.basket_rev += 1
+      obj.save
 
       status 204
       return nil
@@ -253,6 +255,7 @@ module S3Adapter
         obj.etag = etag
         obj.size = size
         obj.content_type = request.media_type
+        obj.deleted = false
       else
         obj = S3Object.create { |o|
           o.basket_type = basket_type

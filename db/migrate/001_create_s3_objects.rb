@@ -7,6 +7,7 @@ class CreateS3Objects < ActiveRecord::Migration
       t.column :path         , :string  , :null => false
       t.column :basket_rev   , :integer , :null => false, :default => 1
       t.column :object       , :blob
+      t.column :deleted      , :boolean , :null => false, :default => false
     end
     add_index :s3_objects, [:basket_type, :path], :unique => true
   end
