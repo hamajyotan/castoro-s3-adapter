@@ -137,7 +137,7 @@ module S3Adapter
       cs = []
       cs << "path like :prefix" unless @prefix.to_s.empty?
       cs << "path > :marker" unless @marker.to_s.empty?
-      objects = S3Object.active.find(:all, :conditions => [cs.join(" and "), :prefix => @prefix.to_s + '%', :marker => @marker.to_s])
+      objects = S3Object.active.find(:all, :conditions => [cs.join(" and "), {:prefix => @prefix.to_s + '%', :marker => @marker.to_s}])
       @contents = objects.map { |o|
         {
           :key => o.path,
