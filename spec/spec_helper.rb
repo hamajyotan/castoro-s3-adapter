@@ -8,7 +8,7 @@ require File.expand_path('../../config/boot', __FILE__)
 require 'monitor'
 module Castoro
   class Client
-    @@temp_dir = File.expand_path('../../spec/tmp', __FILE__)
+    @@temp_dir = File.expand_path('../../tmp/castoro', __FILE__)
     S3Adapter::Adapter::BASE.replace @@temp_dir
 
     def initialize conf = {}

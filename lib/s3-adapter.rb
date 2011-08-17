@@ -1,6 +1,12 @@
 
 module S3Adapter
-  autoload :Adapter            , 's3-adapter/adapter'
-  autoload :AuthorizationHelper, 's3-adapter/authorization_helper'
+  autoload :Adapter, 's3-adapter/adapter'
+
+  module Middleware
+    autoload :Authorization     , 's3-adapter/middleware/authorization'
+    autoload :CommonHeader      , 's3-adapter/middleware/common_header'
+    autoload :InternalError     , 's3-adapter/middleware/internal_error'
+    autoload :UniqueGetParameter, 's3-adapter/middleware/unique_get_parameter'
+  end
 end
 

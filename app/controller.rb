@@ -4,31 +4,23 @@ require 'digest'
 module S3Adapter
   class Controller < Sinatra::Base
 
+    use Middleware::InternalError
+    use Rack::Head
+    use Middleware::CommonHeader
+    use Middleware::UniqueGetParameter
+    use Middleware::Authorization, (S3CONFIG['users'] || {})
+
     set :environment, ENV['RACK_ENV']
     set :logging, true
     set :static, false
     set :views, File.dirname(__FILE__) + "/views"
     set :lock, true
+    set :raise_errors, false
 
     helpers do
-      include S3Adapter::AuthorizationHelper
-
-      ##
-      # adopt_first_query_string
-      #
-      # If there are parameters of the same name, using the first specified value.
-      def adopt_first_query_string
-        request.query_string.split("&").inject({}) { |h,q|
-          k, v = q.split("=", 2)
-          h[k] = v unless h.include?(k)
-          h
-        }
-      end
-
       def get_object basket, key
         modified_since   = Time.httpdate(env["HTTP_IF_MODIFIED_SINCE"]) rescue nil
         unmodified_since = Time.httpdate(env["HTTP_IF_UNMODIFIED_SINCE"]) rescue nil
-        params = adopt_first_query_string
 
         # check bucket name.
         unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
@@ -260,24 +252,15 @@ module S3Adapter
     end
 
     # HEAD Object
-    # response body is nil.
     head %r{^/(.*?)/(.+)$} do |bucket, key|
       @bucket, @key = bucket, key
-      s, h, b = get_object bucket, key
-
-      status s
-      headers h
-      body nil
+      get_object bucket, key
     end
 
     # GET Object
     get %r{^/(.*?)/(.+)$} do |bucket, key|
       @bucket, @key = bucket, key
-      s, h, b = get_object bucket, key
-
-      status s
-      headers h
-      body b
+      get_object bucket, key
     end
 
     # DELETE Object

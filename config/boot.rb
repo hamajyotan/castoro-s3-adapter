@@ -35,6 +35,26 @@ class Castoro::Protocol::Command
   end
 end
 
+module Rack
+  class Request
+    def parse_query(qs)
+      Utils.parse_nested_query(qs, '&')
+    end
+  end
+end
+
+# load configurations.
+default_config = {
+  "buckets" => {
+    "castoro" => {
+      "basket_type" => 999,
+    },
+  },
+  "users" => nil,
+  "castoro-client" => nil,
+}
+S3CONFIG = default_config.merge!(YAML::load_file('config/s3-adapter.yml')[ENV['RACK_ENV']]).freeze
+
 # add to $LOAD_PATH
 $LOAD_PATH << File.expand_path('../../lib/', __FILE__)
 require 's3-adapter'
@@ -44,17 +64,6 @@ Dir.glob(File.expand_path('../../app/models/*.rb', __FILE__)).each { |model| req
 
 # require controller
 require File.expand_path('../../app/controller', __FILE__)
-
-# load configurations.
-default_config = {
-  "buckets" => {
-    "castoro" => {
-      "basket_type" => 999,
-    },
-  },
-  "castoro-client" => nil,
-}
-S3CONFIG = default_config.merge!(YAML::load_file('config/s3-adapter.yml')[ENV['RACK_ENV']]).freeze
 
 # database settings.
 ActiveRecord::Base.configurations = YAML.load_file('config/database.yml')

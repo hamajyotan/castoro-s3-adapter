@@ -3,6 +3,10 @@ development:
   buckets:
     castoro:
       basket_type: 999
+  users:
+    XXXXXXXXXXXXXXXXXXXX:
+      display_name: s3adapter_user
+      secret_access_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   castoro-client:
     my_host: 127.0.0.1
     gateways:
@@ -13,6 +17,10 @@ test:
   buckets:
     castoro:
       basket_type: 999
+  users:
+    XXXXXXXXXXXXXXXXXXXX:
+      display_name: s3adapter_user
+      secret_access_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   castoro-client:
     my_host: 127.0.0.1
     gateways:
@@ -23,6 +31,7 @@ production:
   buckets:
     castoro:
       basket_type: 999
+  users:
   castoro-client:
     gateways:
       - gateway01

@@ -54,6 +54,10 @@ describe 'GET Bucket' do
       last_response.should be_ok
     end
 
+    it "should return response headers" do
+      last_response.header["server"].should == "AmazonS3"
+    end
+
     it 'should return all object-list.' do
       xml = REXML::Document.new last_response.body
       xml.elements["ListBucketResult/Name"].text.should == "castoro"
@@ -89,6 +93,10 @@ describe 'GET Bucket' do
       last_response.should be_not_found
     end
 
+    it "should return response headers" do
+      last_response.header["server"].should == "AmazonS3"
+    end
+
     it 'should return NoSuchBucket response.' do
       xml = REXML::Document.new last_response.body
       xml.elements["Error/Code"].text.should == "NoSuchBucket"
@@ -107,6 +115,10 @@ describe 'GET Bucket' do
 
       it "should return response code 200." do
         last_response.should be_ok
+      end
+
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
       end
 
       it 'should return filtered object-list.' do
@@ -135,6 +147,10 @@ describe 'GET Bucket' do
 
       it "should return response code 200." do
         last_response.should be_ok
+      end
+
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
       end
 
       it 'should return filtered object-list.' do
@@ -167,6 +183,10 @@ describe 'GET Bucket' do
         last_response.should be_ok
       end
 
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+      end
+
       it 'should return filtered object-list.' do
         xml = REXML::Document.new last_response.body
         xml.elements["ListBucketResult/Name"].text.should == "castoro"
@@ -190,6 +210,10 @@ describe 'GET Bucket' do
 
       it "should return response code 200." do
         last_response.should be_ok
+      end
+
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
       end
 
       it 'should return filtered object-list.' do
@@ -223,6 +247,10 @@ describe 'GET Bucket' do
         last_response.should be_ok
       end
 
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+      end
+
       it 'should return filtered object-list.' do
         xml = REXML::Document.new last_response.body
         xml.elements["ListBucketResult/Name"].text.should == "castoro"
@@ -249,6 +277,10 @@ describe 'GET Bucket' do
 
       it "should return response code 200." do
         last_response.should be_ok
+      end
+
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
       end
 
       it 'should return filtered object-list that are sorted (Contents Key, CommonPrefixies Prefix).' do
@@ -279,6 +311,10 @@ describe 'GET Bucket' do
           last_response.should be_ok
         end
 
+        it "should return response headers" do
+          last_response.header["server"].should == "AmazonS3"
+        end
+
         it 'should return one prefix.' do
           xml = REXML::Document.new last_response.body
           xml.elements["ListBucketResult/Name"].text.should == "castoro"
@@ -301,6 +337,10 @@ describe 'GET Bucket' do
 
         it "should return response code 200." do
           last_response.should be_ok
+        end
+
+        it "should return response headers" do
+          last_response.header["server"].should == "AmazonS3"
         end
 
         it 'should return one content.' do

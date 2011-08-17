@@ -4,3 +4,6 @@ log/*.log
 config/database.yml
 config/s3-adapter.yml
 
+tmp/*
+!tmp/restart.txt
+

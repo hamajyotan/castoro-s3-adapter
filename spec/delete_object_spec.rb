@@ -65,6 +65,7 @@ describe 'DELETE Object' do
         last_response.header["content-length"].should == "4"
         last_response.header["content-type"].should   == "application/octet-stream"
         last_response.header["accept-ranges"].should  == "bytes"
+        last_response.header["server"].should         == "AmazonS3"
       end
   
       it "should return specified object value." do
@@ -80,7 +81,11 @@ describe 'DELETE Object' do
       it "should return response code 204." do
         last_response.status.should == 204
       end
-  
+
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+      end  
+
       it "should return no response body." do
         last_response.body.should be_empty
       end
@@ -95,6 +100,10 @@ describe 'DELETE Object' do
         last_response.should be_not_found
       end
   
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+      end 
+
       it "should return NoSuchKey response body." do
         xml = REXML::Document.new last_response.body
         xml.elements["Error/Code"].text.should      == "NoSuchKey"
@@ -123,6 +132,7 @@ describe 'DELETE Object' do
         last_response.header["content-length"].should == "8"
         last_response.header["content-type"].should   == "text/plain"
         last_response.header["accept-ranges"].should  == "bytes"
+        last_response.header["server"].should         == "AmazonS3"
       end
   
       it "should return specified object value." do
@@ -139,6 +149,10 @@ describe 'DELETE Object' do
         last_response.status.should == 204
       end
   
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+      end
+
       it "should return no response body." do
         last_response.body.should be_empty
       end
@@ -153,6 +167,10 @@ describe 'DELETE Object' do
         last_response.should be_not_found
       end
   
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+      end
+
       it "should return NoSuchKey response body." do
         xml = REXML::Document.new last_response.body
         xml.elements["Error/Code"].text.should      == "NoSuchKey"
@@ -173,6 +191,10 @@ describe 'DELETE Object' do
       last_response.should be_not_found
     end
 
+    it "should return response headers" do
+      last_response.header["server"].should == "AmazonS3"
+    end
+
     it "should return NoSuchBucket response body." do
       xml = REXML::Document.new last_response.body
       xml.elements["Error/Code"].text.should       == "NoSuchBucket"
@@ -190,6 +212,10 @@ describe 'DELETE Object' do
 
     it "should return response code 204." do
       last_response.status.should == 204
+    end
+
+    it "should return response headers" do
+      last_response.header["server"].should == "AmazonS3"
     end
 
     it "should return no response body." do
