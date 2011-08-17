@@ -12,6 +12,10 @@ class S3Object < ActiveRecord::Base
     :etag,
     :size,
     :content_type,
+    :expires,
+    :content_encoding,
+    :content_disposition,
+    :cache_control,
   ]
 
   accessors.each { |m|

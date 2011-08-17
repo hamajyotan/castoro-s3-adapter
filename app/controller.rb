@@ -70,11 +70,15 @@ module S3Adapter
         end
 
         hs = {
-          "last-modified" => last_modified.httpdate,
-          "etag" => obj.etag,
-          "accept-ranges" => "bytes",
-          "content-type" => obj.content_type,
+          "last-modified"       => last_modified.httpdate,
+          "etag"                => obj.etag,
+          "accept-ranges"       => "bytes",
         }
+        hs["expires"]             = obj.expires if obj.expires
+        hs["content-type"]        = obj.content_type if obj.content_type
+        hs["cache-control"]       = obj.cache_control if obj.cache_control
+        hs["content-encoding"]    = obj.content_encoding if obj.content_encoding
+        hs["content-disposition"] = obj.content_disposition if obj.content_disposition
 
         [
           "response-content-type",
@@ -102,6 +106,83 @@ module S3Adapter
         else
           return 200, hs, File.open(file, "rb") { |f| f.read }
         end
+      end
+
+      def put_object key
+        # check bucket name.
+        unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
+          return 404, builder(:no_such_bucket)
+        end
+
+        # set object value
+        last_modified       = Time.now.utc.iso8601
+        body                = request.body.read
+        etag                = Digest::MD5.hexdigest(body)
+        size                = body.size
+        expect              = env['HTTP_EXPECT']
+        expires             = env['HTTP_EXPIRES']
+        content_type        = env['CONTENT_TYPE'] || "binary/octet-stream"
+        content_length      = env['CONTENT_LENGTH']
+        @content_md5        = env['HTTP_CONTENT_MD5']
+        cache_control       = env['HTTP_CACHE_CONTROL']
+        content_encoding    = env['HTTP_CONTENT_ENCODING']
+        content_disposition = env['HTTP_CONTENT_DISPOSITION']
+
+        # validate content_length
+        unless content_length
+          return 411, builder(:missing_content_length)
+        end
+
+        # valid content_length error
+        content_length = Integer(env['CONTENT_LENGTH']) rescue (return 400, nil)
+
+        # trancate request body by content_length
+        if content_length.to_i < size.to_i
+          size = content_length
+          request.body.truncate(size)
+        end
+
+        # validate content-MD5
+        if @content_md5 and @content_md5 != etag
+          return 400, builder(:invalid_digest)
+        end
+
+        # get and create basket from database.
+        if (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
+          obj.basket_rev         += 1
+          obj.etag                = etag
+          obj.size                = size
+          obj.last_modified       = last_modified
+          obj.content_type        = content_type
+          obj.expires             = expires if expires
+          obj.cache_control       = cache_control if cache_control
+          obj.content_encoding    = content_encoding if content_encoding
+          obj.content_disposition = content_disposition if content_disposition
+          obj.deleted             = false
+        else
+          obj = S3Object.create { |o|
+            o.basket_type         = basket_type
+            o.path                = key
+            o.basket_rev          = 1
+            o.etag                = etag
+            o.size                = size
+            o.last_modified       = last_modified
+            o.content_type        = content_type
+            o.expires             = expires if expires
+            o.cache_control       = cache_control if cache_control
+            o.content_encoding    = content_encoding if content_encoding
+            o.content_disposition = content_disposition if content_disposition
+          }
+        end
+        obj.save
+        basket = obj.to_basket
+
+        # create basket to castoro.
+        size = 0
+        Adapter.put_basket_file(basket, request.body) { |readed_size|
+          size += readed_size
+        }
+        return 200, nil
       end
 
     end
@@ -235,49 +316,10 @@ module S3Adapter
     # PUT Object
     put %r{^/(.*?)/(.+)$} do |bucket, key|
       @bucket, @key = bucket, key
+      s, b = put_object key
 
-      # check bucket name.
-      unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
-        status 404
-        return builder(:no_such_bucket)
-      end
-
-      # set object value
-      last_modified = Time.now.utc.iso8601
-      body = request.body.read
-      etag = Digest::MD5.hexdigest(body)
-      size = body.size
-
-      # get and create basket from database.
-      if (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
-        obj.basket_rev += 1
-        obj.last_modified = last_modified
-        obj.etag = etag
-        obj.size = size
-        obj.content_type = request.media_type
-        obj.deleted = false
-      else
-        obj = S3Object.create { |o|
-          o.basket_type = basket_type
-          o.path = key
-          o.basket_rev = 1
-          o.last_modified = last_modified
-          o.etag = etag
-          o.size = size
-          o.content_type = request.media_type
-        }
-      end
-      obj.save
-      basket = obj.to_basket
-
-      # create basket to castoro.
-      size = 0
-      Adapter.put_basket_file(basket, request.body) { |readed_size|
-        size += readed_size
-      }
-
-      status 200
-      nil
+      status s
+      body b
     end
 
   end
