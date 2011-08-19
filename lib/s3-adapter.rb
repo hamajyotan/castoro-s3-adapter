@@ -7,6 +7,7 @@ module S3Adapter
     autoload :CommonHeader      , 's3-adapter/middleware/common_header'
     autoload :InternalError     , 's3-adapter/middleware/internal_error'
     autoload :UniqueGetParameter, 's3-adapter/middleware/unique_get_parameter'
+    autoload :UrlRewrite        , 's3-adapter/middleware/url_rewrite'
   end
 end
 

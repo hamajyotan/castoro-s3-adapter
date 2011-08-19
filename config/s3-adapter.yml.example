@@ -14,6 +14,7 @@ development:
       - gateway02
 
 test:
+  domain: s3.adapter
   buckets:
     castoro:
       basket_type: 999

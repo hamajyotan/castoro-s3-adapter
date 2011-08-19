@@ -4,6 +4,7 @@ require 'digest'
 module S3Adapter
   class Controller < Sinatra::Base
 
+    use Middleware::UrlRewrite, S3CONFIG['domain']
     use Middleware::InternalError
     use Rack::Head
     use Middleware::CommonHeader

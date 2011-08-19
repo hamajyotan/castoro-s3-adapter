@@ -366,4 +366,45 @@ describe 'GET Bucket' do
 
   end
 
+  describe 'subdomain access' do
+    context 'given castoro.s3.adapter' do
+      before(:all) do
+        get '/', {}, 'HTTP_HOST' => 'castoro.s3.adapter'
+      end
+
+      it "should return response code 200." do
+        last_response.should be_ok
+      end
+  
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+      end
+  
+      it 'should return all object-list.' do
+        xml = REXML::Document.new last_response.body
+        xml.elements["ListBucketResult/Name"].text.should == "castoro"
+        xml.elements["ListBucketResult/Prefix"].text.should be_nil
+        xml.elements["ListBucketResult/Marker"].text.should be_nil
+        xml.elements["ListBucketResult/MaxKeys"].text.should == "1000"
+        xml.elements["ListBucketResult/IsTruncated"].text.should == "false"
+        xml.elements["ListBucketResult/Contents[1]/Key"].text.should == "foo/bar/baz.txt"
+        xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-21T19:14:36+09:00"
+        xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "ea703e7aa1efda0064eaa507d9e8ab7e"
+        xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "4"
+        xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
+        xml.elements["ListBucketResult/Contents[2]/Key"].text.should == "hoge/fuga.jpg"
+        xml.elements["ListBucketResult/Contents[2]/LastModified"].text.should == "2011-07-22T21:23:41+09:00"
+        xml.elements["ListBucketResult/Contents[2]/ETag"].text.should == "73feffa4b7f6bb68e44cf984c85f6e88"
+        xml.elements["ListBucketResult/Contents[2]/Size"].text.should == "3"
+        xml.elements["ListBucketResult/Contents[2]/StorageClass"].text.should == "STANDARD"
+        xml.elements["ListBucketResult/Contents[3]/Key"].text.should == "hoge/piyo.gif"
+        xml.elements["ListBucketResult/Contents[3]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
+        xml.elements["ListBucketResult/Contents[3]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
+        xml.elements["ListBucketResult/Contents[3]/Size"].text.should == "8"
+        xml.elements["ListBucketResult/Contents[3]/StorageClass"].text.should == "STANDARD"
+        xml.elements["ListBucketResult/Contents[4]"].should be_nil
+      end
+    end
+  end
+
 end
