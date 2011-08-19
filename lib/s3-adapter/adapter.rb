@@ -7,7 +7,11 @@ module S3Adapter
   
     def init
       c = (S3CONFIG["castoro-client"] || {})
-      c["logger"] = Logger.new(STDOUT)
+      if c.to_s == 'mock'
+        require 's3-adapter/mock/castoro-client'
+      else
+        c['logger'] = Logger.new(STDOUT)
+      end
       @@client = Castoro::Client.new c
       @@client.open
     end

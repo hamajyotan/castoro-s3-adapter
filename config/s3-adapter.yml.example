@@ -1,5 +1,6 @@
 
 development:
+  domain: s3.adapter
   buckets:
     castoro:
       basket_type: 999
@@ -7,11 +8,7 @@ development:
     XXXXXXXXXXXXXXXXXXXX:
       display_name: s3adapter_user
       secret_access_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  castoro-client:
-    my_host: 127.0.0.1
-    gateways:
-      - gateway01
-      - gateway02
+  castoro-client: mock
 
 test:
   domain: s3.adapter
@@ -22,11 +19,7 @@ test:
     XXXXXXXXXXXXXXXXXXXX:
       display_name: s3adapter_user
       secret_access_key: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  castoro-client:
-    my_host: 127.0.0.1
-    gateways:
-      - gateway01
-      - gateway01
+  castoro-client: mock
 
 production:
   buckets:

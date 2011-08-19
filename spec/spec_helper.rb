@@ -1,72 +1,6 @@
 
 ENV['RACK_ENV'] = 'test'
 
-# boot.
-require File.expand_path('../../config/boot', __FILE__)
-
-# redefined castoro-client
-require 'monitor'
-module Castoro
-  class Client
-    @@temp_dir = File.expand_path('../../tmp/castoro', __FILE__)
-    S3Adapter::Adapter::BASE.replace @@temp_dir
-
-    def initialize conf = {}
-      @locker = Monitor.new
-      @alive = false
-      @sid = 0
-
-      if block_given?
-        self.open
-        begin
-          yield self
-        ensure
-          self.close
-        end
-      end
-    end
-    def open
-      @locker.synchronize {
-        raise ClientError, "client already opened." if opened?
-        @alive = true
-      }
-    end
-    def close
-      @locker.synchronize {
-        raise ClientError, "client already closed." if closed?
-        @alive = false
-      }
-    end
-
-    def opened?; @locker.synchronize { !! @alive }; end
-    def closed?; ! opened?; end
-    def sid
-      @locker.synchronize { @sid }
-    end
-
-    def get key
-      @locker.synchronize {
-        path = File.join(@@temp_dir, "host", key.to_s)
-        raise ClientTimeoutError, "command timeout" unless File.exist?(path)
-        { "host" => key.to_s }
-      }
-    end
-    def create key, hints = {}
-      @locker.synchronize {
-        dir = File.join(@@temp_dir, "host", key.to_s)
-        raise ClientAlreadyExistsError, "[key:#{key.to_s}] Basket already exists in peers" if File.exist?(dir)
-        FileUtils.mkdir_p dir
-        yield "host", key.to_s
-      }
-    end
-    def delete key
-      get(key).each { |k,v|
-        FileUtils.rm_r File.join(@@temp_dir, k, v) if File.directory?(File.join(@@temp_dir, k, v))
-      }
-    end
-  end
-end
-
 # application.
 require File.expand_path('../../config/application', __FILE__)
 
@@ -198,6 +132,62 @@ module Rack
       end
     end
   end
+end
+
+def signature_path path, query
+  params = [].tap { |p|
+    [
+      'response-cache-control',
+      'response-content-disposition',
+      'response-content-encoding',
+      'response-content-language',
+      'response-content-type',
+      'response-expires',
+    ].sort.each { |k|
+      p << "#{k}=#{query[k]}" if query.include?(k)
+    }
+  }
+
+  "#{path}#{params.empty? ? '' : '?'}#{params.join('&')}"
+end
+
+def aws_signature secret, method, path, headers = {}
+  query = {}
+  key = path.split("?", 2)[0]
+  req_params = path.split("?", 2)[1]
+  if req_params
+    req_params.split("&").each { |p|
+      query["#{p.split("=", 2)[0]}"] = p.split("=", 2)[1] unless query["#{p.split("=", 2)[0]}"]
+    }
+  end
+  path = signature_path key, query
+  hs = {}.tap { |h|
+    headers.select { |k,v| k.index('HTTP_') == 0 }.each { |k,v|
+      h[k['HTTP_'.size, k.size].downcase.tr('_', '-')] = v.to_s
+    }
+  }
+
+  msg = [
+    method.upcase,
+    hs['content-md5']   || '',
+    hs['CONTENT_TYPE'] || '',
+    hs['x-amz-date']    || hs['date'] || '',
+  ]
+
+  hs.map { |k, v|
+    key = k.strip.gsub(/\s+/u, ' ')
+    val = v.strip.gsub(/\s+/u, ' ')
+    (key.index('x-amz-') == 0) ? [key, val] : nil
+  }.compact.sort { |x, y|
+    x[0] <=> y[0]
+  }.each { |k,v|
+    msg << "#{k}:#{v}"
+  }
+
+  msg << path
+
+  hmac = OpenSSL::HMAC.new(secret, OpenSSL::Digest::SHA1.new)
+  [hmac.update(msg.join("\n")).digest].pack("m").gsub(/\s/u, '')
 end
 
 def app

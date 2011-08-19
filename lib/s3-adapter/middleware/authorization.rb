@@ -37,11 +37,11 @@ module S3Adapter::Middleware
           'response-cache-control',
           'response-content-disposition',
           'response-content-encoding',
-          'response-content-langage',
+          'response-content-language',
           'response-content-type',
           'response-expires',
         ].sort.each { |k|
-          p << "#{k}=#{req.GET(k)}" if req.GET.include?(k)
+          p << "#{k}=#{req.GET[k]}" if req.GET.include?(k)
         }
       }
 
