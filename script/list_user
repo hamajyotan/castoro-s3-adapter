@@ -1,0 +1,40 @@
+#!/usr/bin/env ruby
+
+require File.expand_path('../../config/boot', __FILE__)
+ActiveRecord::Base.establish_connection ENV['RACK_ENV']
+
+require 'optparse'
+
+options = {
+  :verbose => false,
+}
+
+OptionParser.new { |opt|
+  opt.banner = "Usage: #{File.basename($0)} [options]"
+
+  opt.on('-v', '--verbose', 'verbose output') { |v|
+    options[:verbose] = v
+  }
+
+  begin
+    opt.parse! ARGV
+  rescue
+    $stderr.puts opt.help
+    exit(1)
+  end
+}
+
+access_key_id, secret_access_key, display_name = ARGV
+
+ActiveRecord::Base.logger.level = options[:verbose] ? Logger::DEBUG : Logger::INFO
+
+users = User.find(:all)
+
+$stderr.puts "user - count -> #{users.size}"
+$stderr.puts "+----------------------+----------------------+------------------------------------------+"
+$stderr.puts "| display_name         | access_key_id        | secret_access_key                        |"
+$stderr.puts "+----------------------+----------------------+------------------------------------------+"
+users.each { |u|
+  $stderr.puts "| #{"%-20s" % u.display_name} | #{"%-20s" % u.access_key_id} | #{"%-40s" % u.secret_access_key} |"
+}
+$stderr.puts "+----------------------+----------------------+------------------------------------------+"

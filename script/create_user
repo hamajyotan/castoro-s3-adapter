@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+
+require File.expand_path('../../config/boot', __FILE__)
+ActiveRecord::Base.establish_connection ENV['RACK_ENV']
+
+require 'optparse'
+
+options = {
+  :attributes => {
+    :display_name => nil,
+  },
+  :verbose => false,
+}
+
+OptionParser.new { |opt|
+  opt.banner = "Usage: #{File.basename($0)} [options] DISPLAY_NAME"
+
+  opt.on('-k [KEY]', '--access-key-id', 's3 account access key key') { |v|
+    options[:attributes][:access_key_id] = v
+  }
+  opt.on('-s [SECRET]', '--secret-access-key', 's3 account secret access key') { |v|
+    options[:attributes][:secret_access_key] = v
+  }
+  opt.on('-v', '--verbose', 'verbose output') { |v|
+    options[:verbose] = v
+  }
+
+  begin
+    opt.parse! ARGV
+  rescue
+    $stderr.puts opt.help
+    exit(1)
+  end
+}
+options[:attributes][:display_name] = ARGV.shift
+
+ActiveRecord::Base.logger.level = options[:verbose] ? Logger::DEBUG : Logger::INFO
+
+u = User.create { |u|
+  u.update_attributes options[:attributes]
+  u.save
+  unless u.errors.empty?
+    $stderr.puts "#{File.basename($0)} - Error !"
+    u.errors.each { |k,v|
+      $stderr.puts "\t#{"%-20s" % k}: #{v}"
+    }
+    exit(1)
+  end
+}
+
+$stderr.puts "completed!"
+$stderr.puts "\tdisplay_name      : #{u.display_name}"
+$stderr.puts "\taccess_key_id     : #{u.access_key_id}"
+$stderr.puts "\tsecret_access_key : #{u.secret_access_key}"
+exit(0)
+

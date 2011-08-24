@@ -9,7 +9,7 @@ module S3Adapter
     use Rack::Head
     use Middleware::CommonHeader
     use Middleware::UniqueGetParameter
-    use Middleware::Authorization, (S3CONFIG['users'] || {})
+    use Middleware::Authorization
 
     set :environment, ENV['RACK_ENV']
     set :logging, true

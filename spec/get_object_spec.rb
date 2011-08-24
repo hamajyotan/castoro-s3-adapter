@@ -47,15 +47,20 @@ describe 'GET Object' do
       o.content_type  = "text/plain"
       o.save
     }
-    @access_key        = "XXXXXXXXXXXXXXXXXXXX"
-    @secret_access_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    User.delete_all
+    User.new { |u|
+      u.display_name = "s3adapter_user"
+      @access_key_id     = u.access_key_id     = "XXXXXXXXXXXXXXXXXXXX"
+      @secret_access_key = u.secret_access_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      u.save
+    }
   end
 
   context "given valid bucketname and objectkey(foo/bar/baz.txt)" do
     before(:all) do
       path = "/castoro/foo/bar/baz.txt"
       signature = aws_signature(@secret_access_key, "GET", path, {})
-      get path, {}, "HTTP_HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+      get path, {}, "HTTP_HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
     end
 
     it "should return response code 200." do
@@ -80,7 +85,7 @@ describe 'GET Object' do
     before(:all) do
       path = "/castoro/hoge/fuga/piyo.txt"
       signature = aws_signature(@secret_access_key, "GET", path, {})
-      get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+      get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
     end
 
     it "should return response code 200." do
@@ -105,7 +110,7 @@ describe 'GET Object' do
     before(:all) do
       path = "/hoge/foo/bar/baz.txt"
       signature = aws_signature(@secret_access_key, "GET", path, {})
-      get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+      get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
     end
 
     it "should return response code 404." do
@@ -130,7 +135,7 @@ describe 'GET Object' do
     before(:all) do
       path = "/castoro/foo/foo/foo.txt"
       signature = aws_signature(@secret_access_key, "GET", path,{})
-      get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+      get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
     end
 
     it "should return response code 404." do
@@ -156,7 +161,7 @@ describe 'GET Object' do
       before(:all) do
         path = "/castoro/foo/bar/baz.txt?response-cache-control=hoge.cache-control"
         signature = aws_signature(@secret_access_key, "GET", path, {})
-        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
       end
 
       it "should return response code 200." do
@@ -177,7 +182,7 @@ describe 'GET Object' do
       before(:all) do
         path = "/castoro/foo/bar/baz.txt?response-content-disposition=attachment;filename=hoge-disposition.txt"
         signature = aws_signature(@secret_access_key, "GET", path, {})
-        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
       end
 
       it "should return response code 200." do
@@ -198,7 +203,7 @@ describe 'GET Object' do
       before(:all) do
         path = "/castoro/foo/bar/baz.txt?response-content-encoding=hoge.encoding"
         signature = aws_signature(@secret_access_key, "GET", path, {})
-        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
       end
 
       it "should return response code 200." do
@@ -219,7 +224,7 @@ describe 'GET Object' do
       before(:all) do
         path = "/castoro/foo/bar/baz.txt?response-content-language=hoge.language"
         signature = aws_signature(@secret_access_key, "GET", path, {})
-        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
       end
 
       it "should return response code 200." do
@@ -240,7 +245,7 @@ describe 'GET Object' do
       before(:all) do
         path = "/castoro/foo/bar/baz.txt?response-content-type=hoge.content-type"
         signature = aws_signature(@secret_access_key, "GET", path, {})
-        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
       end
 
       it "should return response code 200." do
@@ -261,7 +266,7 @@ describe 'GET Object' do
       before(:all) do
         path = "/castoro/foo/bar/baz.txt?response-expires=hoge-expires"
         signature = aws_signature(@secret_access_key, "GET", path, {})
-        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
       end
 
       it "should return response code 200." do
@@ -287,7 +292,7 @@ describe 'GET Object' do
             "&response-content-type=hoge.content-type" <<
             "&response-expires=hoge-expires"
         signature = aws_signature(@secret_access_key, "GET", path, {})
-        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
       end
 
       it "should return response code 200." do
@@ -324,7 +329,7 @@ describe 'GET Object' do
             "&response-expires=hoge-expires" <<
             "&response-expires=fuga-expires"
         signature = aws_signature(@secret_access_key, "GET", path, {})
-        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key}:#{signature}"
+        get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
       end
 
       it "should return response code 200." do
@@ -353,7 +358,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_RANGE" => "bytes=0-2"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -381,7 +386,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_RANGE" => "1-3"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -403,7 +408,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_RANGE" => "bytes=4-10"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -431,7 +436,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_RANGE" => "bytes=3-10"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -454,7 +459,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_MODIFIED_SINCE" => "Wed, 13 Jul 2011 19:14:36 GMT"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -476,7 +481,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_MODIFIED_SINCE" => "Thu, 21 Jul 2011 19:14:36 GMT"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -498,7 +503,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_MODIFIED_SINCE" => "Wed, 27 Jul 2011 19:14:36 GMT"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -520,7 +525,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_UNMODIFIED_SINCE" => "Wed, 13 Jul 2011 19:14:36 GMT"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -547,7 +552,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_UNMODIFIED_SINCE" => "Thu, 21 Jul 2011 19:14:36 GMT"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -569,7 +574,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_UNMODIFIED_SINCE" => "Wed, 27 Jul 2011 19:14:36 GMT"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -591,7 +596,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_MATCH" => "ea703e7aa1efda0064eaa507d9e8ab7e"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -613,7 +618,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_MATCH" => "02ccdb34c1f7a8c84b72e003ddd77173"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -640,7 +645,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_NONE_MATCH" => "02ccdb34c1f7a8c84b72e003ddd77173"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -662,7 +667,7 @@ describe 'GET Object' do
         path = "/castoro/foo/bar/baz.txt"
         headers = {"HTTP_IF_NONE_MATCH" => "ea703e7aa1efda0064eaa507d9e8ab7e"}
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -690,7 +695,7 @@ describe 'GET Object' do
           "HTTP_IF_NONE_MATCH"       => "02ccdb34c1f7a8c84b72e003ddd77173"
         }
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -719,7 +724,7 @@ describe 'GET Object' do
           "HTTP_IF_NONE_MATCH"       => "ea703e7aa1efda0064eaa507d9e8ab7e"
         }
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -749,7 +754,7 @@ describe 'GET Object' do
           "HTTP_IF_NONE_MATCH"     => "ea703e7aa1efda0064eaa507d9e8ab7e"
         }
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 
@@ -774,7 +779,7 @@ describe 'GET Object' do
           "HTTP_IF_NONE_MATCH"     => "02ccdb34c1f7a8c84b72e003ddd77173"
         }
         signature = aws_signature(@secret_access_key, "GET", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key}:#{signature}"
+        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
         get path, {}, headers
       end
 

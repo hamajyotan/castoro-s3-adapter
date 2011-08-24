@@ -50,10 +50,11 @@ default_config = {
       "basket_type" => 999,
     },
   },
-  "users" => nil,
   "castoro-client" => nil,
 }
-S3CONFIG = default_config.merge!(YAML::load_file('config/s3-adapter.yml')[ENV['RACK_ENV']]).freeze
+S3CONFIG = default_config.merge!(
+  YAML::load_file(File.expand_path('../../config/s3-adapter.yml', __FILE__))[ENV['RACK_ENV']]
+).freeze
 
 # add to $LOAD_PATH
 $LOAD_PATH << File.expand_path('../../lib/', __FILE__)
@@ -66,6 +67,6 @@ Dir.glob(File.expand_path('../../app/models/*.rb', __FILE__)).each { |model| req
 require File.expand_path('../../app/controller', __FILE__)
 
 # database settings.
-ActiveRecord::Base.configurations = YAML.load_file('config/database.yml')
+ActiveRecord::Base.configurations = YAML.load_file(File.expand_path('../../config/database.yml', __FILE__))
 ActiveRecord::Base.logger = Logger.new $stdout
 

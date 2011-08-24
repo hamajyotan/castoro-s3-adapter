@@ -1,0 +1,44 @@
+#!/usr/bin/env ruby
+
+require File.expand_path('../../config/boot', __FILE__)
+ActiveRecord::Base.establish_connection ENV['RACK_ENV']
+
+require 'optparse'
+
+options = {
+  :attributes => {
+    :display_name => nil,
+  },
+  :verbose => false,
+}
+
+OptionParser.new { |opt|
+  opt.banner = "Usage: #{File.basename($0)} [options] DISPLAY_NAME"
+
+  opt.on('-v', '--verbose', 'verbose output') { |v|
+    options[:verbose] = v
+  }
+
+  begin
+    opt.parse! ARGV
+  rescue
+    $stderr.puts opt.help
+    exit(1)
+  end
+}
+options[:attributes][:display_name] = ARGV.shift
+
+ActiveRecord::Base.logger.level = options[:verbose] ? Logger::DEBUG : Logger::INFO
+
+u = User.find_by_display_name(options[:attributes][:display_name]) rescue nil
+unless u
+  $stderr.puts "#{File.basename($0)} - Error !"
+  $stderr.puts "\tno such user - #{options[:attributes][:display_name]}"
+  exit(1)
+end
+
+u.delete
+
+$stderr.puts "completed!"
+exit(0)
+

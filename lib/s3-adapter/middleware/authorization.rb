@@ -4,9 +4,8 @@ require 'openssl'
 module S3Adapter::Middleware
   class Authorization
 
-    def initialize app, users
+    def initialize app
       @app = app
-      @users = users
     end
 
     def call env
@@ -20,12 +19,13 @@ module S3Adapter::Middleware
       authorization = env['HTTP_AUTHORIZATION'].to_s
       return nil unless authorization =~ /^AWS (\w+):(.+)$/
       access_key_id, secret = $1, $2
-      return nil unless user = @users[access_key_id]
+      user = User.find_by_access_key_id(access_key_id) rescue nil
+      return nil unless user
 
-      if aws_signature(user['secret_access_key'], env) == secret
+      if aws_signature(user.secret_access_key.to_s, env) == secret
         {
-          'access_key_id' => access_key_id,
-          'display_name' => user['display_name']
+          'access_key_id' => access_key_id.to_s,
+          'display_name' => user.display_name.to_s,
         }
       end
     end
