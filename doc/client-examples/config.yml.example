@@ -1,0 +1,8 @@
+---
+address: 127.0.0.1
+port: 9292
+bucket: castoro
+parameters: {}
+headers:
+  Date: <%= require 'time'; Time.now.httpdate %>
+
