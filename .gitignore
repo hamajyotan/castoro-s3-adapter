@@ -3,6 +3,7 @@ log/*.log
 
 config/database.yml
 config/s3-adapter.yml
+doc/client-examples/config.yml
 
 tmp/*
 !tmp/restart.txt
