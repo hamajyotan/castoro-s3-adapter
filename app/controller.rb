@@ -73,6 +73,7 @@ module S3Adapter
         hs["content-encoding"]    = obj.content_encoding if obj.content_encoding
         hs["content-disposition"] = obj.content_disposition if obj.content_disposition
 
+        # response-* headers
         unless request.GET.empty?
           [
             "response-cache-control",
@@ -81,11 +82,12 @@ module S3Adapter
             "response-content-language",
             "response-content-type",
             "response-expires",
-          ].tap { |qs|
-            if qs.any? { |q| params.include?(q) } and env['s3adapter.authorization'].nil?
+          ].select { |q| params.include?(q) }.tap { |qs|
+
+            if not qs.empty? and env['s3adapter.authorization'].nil?
               return 400, {}, builder(:invalid_request)
             end
-            qs.each { |q| hs[q.sub("response-", "")] = params[q] }
+          qs.each { |q| hs[q.sub("response-", "")] = params[q] }
           }
         end
 

@@ -16,6 +16,9 @@ command_line { |opt|
   opt.on('-b [BUCKET]', '--bucket', "s3 bucketname (default: #{options['bucket']})") { |v|
     options['bucket'] = v
   }
+  opt.on('-n', '--anonymous', "Anonymous user request") { |v|
+    options['anonymous'] = v
+  }
 
   opt.on('--head-x-amz-mfa [HEAD]', 'DELETE Object header x-amz-mfa') { |v|
     options['headers']['x-amz-mfa'] = v
@@ -41,6 +44,9 @@ Net::HTTP.start(options['address'], options['port']) { |http|
     uri << '?' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
   end
   headers = options['headers']
+  if options['auth'] and not options['anonymous']
+    headers['Authorization'] = authorization_header 'DELETE', uri, headers, options['auth']
+  end
 
   res = http.delete(uri, headers)
 

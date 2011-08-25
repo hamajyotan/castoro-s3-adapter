@@ -16,6 +16,9 @@ command_line { |opt|
   opt.on('-b [BUCKET]', '--bucket', "s3 bucketname (default: #{options['bucket']})") { |v|
     options['bucket'] = v
   }
+  opt.on('-n', '--anonymous', "Anonymous user request") { |v|
+    options['anonymous'] = v
+  }
 
   opt.on('--param-delimiter [PARAM]', "GET Bucket parameter delimiter") { |v|
     options['parameters']['delimiter'] = v
@@ -48,6 +51,9 @@ Net::HTTP.start(options['address'], options['port']) { |http|
     uri << '?' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
   end
   headers = options['headers']
+  if options['auth'] and not options['anonymous']
+    headers['Authorization'] = authorization_header 'GET', uri, headers, options['auth']
+  end
 
   res = http.get(uri, headers)
 

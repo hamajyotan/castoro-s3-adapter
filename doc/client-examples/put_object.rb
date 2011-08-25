@@ -16,6 +16,9 @@ command_line { |opt|
   opt.on('-b [BUCKET]', '--bucket', "s3 bucketname (default: #{options['bucket']})") { |v|
     options['bucket'] = v
   }
+  opt.on('-n', '--anonymous', "Anonymous user request") { |v|
+    options['anonymous'] = v
+  }
 
   opt.on('--head-cache-control [HEAD]', 'PUT Object header Cache-Control') { |v|
     options['headers']['Cache-Control'] = v
@@ -69,6 +72,9 @@ Net::HTTP.start(options['address'], options['port']) { |http|
     uri << '?' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
   end
   headers = options['headers']
+  if options['auth'] and not options['anonymous']
+    headers['Authorization'] = authorization_header 'PUT', uri, headers, options['auth']
+  end
   data = File.open(options['file'], 'r') { |f| f.read }
 
   res = http.put(uri, data, headers)
