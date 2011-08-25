@@ -64,8 +64,13 @@ command_line { |opt|
 
 
 require 'net/http'
+http_class = if options['proxy']
+               Net::HTTP::Proxy(options['proxy']['address'], options['proxy']['port'])
+             else
+               Net::HTTP
+             end
 
-Net::HTTP.start(options['address'], options['port']) { |http|
+http_class.start(options['address'], options['port']) { |http|
 
   uri = "/#{options['bucket']}/#{options['object']}"
   unless options['parameters'].empty?

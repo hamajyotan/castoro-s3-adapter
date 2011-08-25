@@ -2,6 +2,9 @@
 address: 127.0.0.1
 port: 9292
 bucket: castoro
+#proxy:
+#  address: proxy.example.com
+#  port: 8080
 #auth:
 #  access-key-id: AStringOfAccessKeyId
 #  secret-access-key: AStringOfSecretAccessKey
