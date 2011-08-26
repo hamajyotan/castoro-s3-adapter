@@ -70,3 +70,8 @@ def authorization_header method, uri, headers, auth
   "AWS #{access_key_id}:#{signature}"
 end
 
+require 'net/http'
+
+class Net::HTTPGenericRequest
+  def supply_default_content_type; end
+end

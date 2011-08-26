@@ -20,9 +20,6 @@ command_line { |opt|
     options['anonymous'] = v
   }
 
-  opt.on('--head-content-type [HEAD]', 'PUT Object Copy header Content-Type') { |v|
-    options['headers']['Content-Type'] = v
-  }
   opt.on('--head-x-amz-acl [HEAD]', 'PUT Object Copy header x-amz-acl') { |v|
     options['headers']['x-amz-acl'] = v
   }
