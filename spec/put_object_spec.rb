@@ -31,6 +31,33 @@ describe 'PUT Object' do
 
   end
 
+  context "zerobyte file put" do
+    before(:all) do
+      put "/castoro/zerobyte/file.txt", "", "CONTENT_LENGTH" => "0"
+    end
+
+    it "should return response code 200." do
+      last_response.should be_ok
+    end
+
+    it "should return specified object value." do
+      last_response.body.should be_empty
+    end
+
+    it "should store object recrod" do
+      find_by_bucket_and_path('castoro', 'zerobyte/file.txt') { |obj|
+        obj.should_not be_nil
+        obj.size.should == 0
+      }
+    end
+
+    it "should store zerobyte file" do
+      find_file_by_bucket_and_path('castoro', 'zerobyte/file.txt') { |f|
+        f.read
+      }.should == ""
+    end
+  end
+
   context "given bucketname and objectkey(foo/bar/baz.txt)" do
     before(:all) do
       put "/castoro/foo/bar/baz.txt", "abcd", "CONTENT_LENGTH" => "4"

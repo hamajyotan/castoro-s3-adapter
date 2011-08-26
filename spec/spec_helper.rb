@@ -196,3 +196,23 @@ end
 
 ActiveRecord::Base.logger.level = Logger::INFO
 
+def bucket_to_basket_type bucket
+  S3CONFIG['buckets'][bucket]['basket_type']
+end
+
+def find_by_bucket_and_path bucket, path
+  type = bucket_to_basket_type(bucket)
+  yield S3Object.find_by_basket_type_and_path(type, path)
+end
+
+def find_file_by_bucket_and_path bucket, path
+  type = bucket_to_basket_type(bucket)
+  obj = S3Object.find_by_basket_type_and_path(type, path)
+  id, rev = obj.id, obj.basket_rev
+
+  ret = Castoro::Client.new(nil).get("#{id}.#{type}.#{rev}".to_basket)
+  host, path = ret.first
+  path = File.join(S3Adapter::Adapter::BASE, host, path, S3Adapter::Adapter::S3ADAPTER_FILE)
+  File.open(path, 'r') { |f| yield(f) }
+end
+
