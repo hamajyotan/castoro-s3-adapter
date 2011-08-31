@@ -170,7 +170,7 @@ def aws_signature secret, method, path, headers = {}
   msg = [
     method.upcase,
     hs['content-md5']   || '',
-    hs['CONTENT_TYPE'] || '',
+    headers['CONTENT_TYPE'] || '',
     hs['x-amz-date']    || hs['date'] || '',
   ]
 
@@ -202,7 +202,8 @@ end
 
 def find_by_bucket_and_path bucket, path
   type = bucket_to_basket_type(bucket)
-  yield S3Object.find_by_basket_type_and_path(type, path)
+  obj = S3Object.find_by_basket_type_and_path(type, path) rescue nil
+  yield obj if obj
 end
 
 def find_file_by_bucket_and_path bucket, path

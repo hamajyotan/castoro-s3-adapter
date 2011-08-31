@@ -1,6 +1,7 @@
 
 module S3Adapter
   autoload :Adapter, 's3-adapter/adapter'
+  autoload :DependencyInjector, 's3-adapter/dependency_injector'
 
   module Middleware
     autoload :Authorization     , 's3-adapter/middleware/authorization'

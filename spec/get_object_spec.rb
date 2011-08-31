@@ -60,7 +60,7 @@ describe 'GET Object' do
     before(:all) do
       path = "/castoro/foo/bar/baz.txt"
       signature = aws_signature(@secret_access_key, "GET", path, {})
-      get path, {}, "HTTP_HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
+      get path, {}, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
     end
 
     it "should return response code 200." do

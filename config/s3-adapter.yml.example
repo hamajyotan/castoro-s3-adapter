@@ -11,6 +11,8 @@ test:
   buckets:
     castoro:
       basket_type: 999
+    test:
+      basket_type: 1000
   castoro-client: mock
 
 production:

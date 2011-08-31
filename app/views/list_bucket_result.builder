@@ -1,5 +1,5 @@
 xml.instruct! :xml, :version => "1.0", :encoding => "UTF-8"
-xml.ListBucketResult :xmlins => "http://s3.amazonaws.com/doc/2006-03-01/" do
+xml.ListBucketResult :xmlns => "http://s3.amazonaws.com/doc/2006-03-01/" do
   xml.Name @bucket
   xml.Prefix @prefix
   xml.Marker @marker
