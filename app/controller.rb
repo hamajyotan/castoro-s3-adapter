@@ -341,6 +341,26 @@ module S3Adapter
 
     end
 
+    # GET Service
+    get '/' do
+      unless env['s3adapter.authorization']
+        headers['location'] = 'http://aws.amazon.com/s3'
+        return 307
+      end
+
+      @owner_id = env['s3adapter.authorization']['access_key_id']
+      @display_name = env['s3adapter.authorization']['display_name']
+      @buckets = S3CONFIG['buckets'].select { |k,v|
+        v['owner'] == env['s3adapter.authorization']['access_key_id']
+      }.map { |k,v|
+        {
+          :name => k,
+          :creation_date => DependencyInjector.time_now.utc.iso8601,
+        }
+      }
+      return builder(:list_all_my_buckets_result)
+    end
+
     # GET Bucket
     get %r{^/([\w]+)/?$} do |bucket|
       @bucket    = bucket

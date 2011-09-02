@@ -216,4 +216,3 @@ def find_file_by_bucket_and_path bucket, path
   path = File.join(S3Adapter::Adapter::BASE, host, path, S3Adapter::Adapter::S3ADAPTER_FILE)
   File.open(path, 'r') { |f| yield(f) }
 end
-

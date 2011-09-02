@@ -4,6 +4,7 @@ development:
   buckets:
     castoro:
       basket_type: 999
+      owner: XXXXXXXXXXXXXXXXXXXX
   castoro-client: mock
 
 test:
@@ -11,8 +12,10 @@ test:
   buckets:
     castoro:
       basket_type: 999
+      owner: XXXXXXXXXXXXXXXXXXXX
     test:
       basket_type: 1000
+      owner: AStringOfAccessKeyId
   castoro-client: mock
 
 production:
