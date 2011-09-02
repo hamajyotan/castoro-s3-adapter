@@ -64,7 +64,7 @@ describe 'PUT Object Copy' do
     @time_mock.stub!(:iso8601).and_return { '2011-08-26T01:14:09Z' }
   end
 
-  context "given source same bucket object(/castoro/foo/bar/baz.txt)" do
+  context "given source same bucketname objectkey(/castoro/foo/bar/baz.txt)" do
     before do
       path = "/castoro/foo/bar/baz_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" }
@@ -79,7 +79,7 @@ describe 'PUT Object Copy' do
     end
 
     it "should return response headers." do
-      last_response.header["content-type"].should == "application/xml"
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
       last_response.header["server"].should       == "AmazonS3"
     end
 
@@ -109,7 +109,7 @@ describe 'PUT Object Copy' do
 
   end
 
-  context "given source same bucket object(/test/hoge/fuga/piyo.txt)" do
+  context "given source same bucketname objectkey(/test/hoge/fuga/piyo.txt)" do
     before do
       path = "/test/hoge/fuga/piyo_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/test/hoge/fuga/piyo.txt" }
@@ -123,7 +123,7 @@ describe 'PUT Object Copy' do
     end
 
     it "should return response headers." do
-      last_response.header["content-type"].should == "application/xml"
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
       last_response.header["server"].should       == "AmazonS3"
     end
 
@@ -134,7 +134,7 @@ describe 'PUT Object Copy' do
     end
   end
 
-  context "given source other bucket object(/test/hoge/fuga/piyo.txt)" do
+  context "given source other bucketname objectkey(/test/hoge/fuga/piyo.txt)" do
     before do
       path = "/castoro/hoge/fuga/piyo_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/test/hoge/fuga/piyo.txt" }
@@ -149,7 +149,7 @@ describe 'PUT Object Copy' do
     end
 
     it "should return response headers." do
-      last_response.header["content-type"].should == "application/xml"
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
       last_response.header["server"].should       == "AmazonS3"
     end
 
@@ -191,7 +191,7 @@ describe 'PUT Object Copy' do
     end
 
     it "should return response header." do
-      last_response.header["content-type"].should == "application/xml"
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
       last_response.header["server"].should       == "AmazonS3"
     end
 
@@ -218,7 +218,7 @@ describe 'PUT Object Copy' do
     end
 
     it "should return response header." do
-      last_response.header["content-type"].should == "application/xml"
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
       last_response.header["server"].should       == "AmazonS3"
     end
 
@@ -247,7 +247,7 @@ describe 'PUT Object Copy' do
     end
 
     it "should return response headers." do
-      last_response.header["content-type"].should == "application/xml"
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
       last_response.header["server"].should       == "AmazonS3"
     end
 
@@ -275,7 +275,7 @@ describe 'PUT Object Copy' do
     end
 
     it "should return response headers." do
-      last_response.header["content-type"].should == "application/xml"
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
       last_response.header["server"].should       == "AmazonS3"
     end
 
@@ -313,7 +313,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -364,7 +364,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -409,7 +409,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -437,7 +437,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -468,7 +468,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -496,7 +496,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -527,7 +527,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -555,7 +555,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -586,7 +586,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -617,7 +617,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -648,7 +648,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -676,7 +676,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -705,7 +705,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -734,7 +734,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -762,7 +762,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -793,7 +793,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -824,7 +824,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 
@@ -854,7 +854,7 @@ describe 'PUT Object Copy' do
       end
 
       it "should return response headers." do
-        last_response.header["content-type"].should == "application/xml"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
         last_response.header["server"].should       == "AmazonS3"
       end
 

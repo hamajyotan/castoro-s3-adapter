@@ -25,31 +25,36 @@ module S3Adapter
 
         # check bucket name.
         unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
-          return 404, {}, builder(:no_such_bucket)
+          status 404
+          return builder(:no_such_bucket)
         end
 
         # get basket from database.
         unless (obj = S3Object.active.find_by_basket_type_and_path(basket_type, key))
-          return 404, {}, builder(:no_such_key)
+          status 404
+          return builder(:no_such_key)
         end
 
         last_modified = Time.parse(obj.last_modified)
 
         # get file from castoro.
         unless (file = Adapter.get_basket_file(obj.to_basket))
-          return 404, {}, builder(:no_such_key)
+          status 404
+          return builder(:no_such_key)
         end
 
         # check if_unmodified_since
         if unmodified_since and unmodified_since < last_modified
           @condition = 'If-Unmodified-Since'
-          return 412, {}, builder(:precondition_failed)
+          status 412
+          return builder(:precondition_failed)
         end
 
         # check if_match
         if env["HTTP_IF_MATCH"] and obj.etag != env["HTTP_IF_MATCH"].gsub("\"", "")
           @condition = 'If-Match'
-          return 412, {}, builder(:precondition_failed)
+          status 412
+          return builder(:precondition_failed)
         end
 
         if env["HTTP_RANGE"] =~ /^bytes=(\d*)-(\d*)$/
@@ -58,7 +63,8 @@ module S3Adapter
             @message = "The requested range is not satisfiable"
             @actual_object_size = obj.size
             @range_requested = env["HTTP_RANGE"]
-            return 416, {}, builder(:invalid_range)
+            status 416
+            return builder(:invalid_range)
           end
         end
 
@@ -86,7 +92,8 @@ module S3Adapter
 
             if not qs.empty? and env['s3adapter.authorization'].nil?
               @message = "Request specific response headers cannot be used for anonymous GET requests."
-              return 400, {}, builder(:invalid_request)
+              status 400
+              return builder(:invalid_request)
             end
           qs.each { |q| hs[q.sub("response-", "")] = params[q] }
           }
@@ -112,41 +119,41 @@ module S3Adapter
       def put_object bucket, key
         # check bucket name.
         unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
-          return 404, builder(:no_such_bucket)
+          status 404
+          return builder(:no_such_bucket)
         end
 
-        # set object value
-        last_modified       = DependencyInjector.time_now.utc.iso8601
-        body                = request.body.read
-        etag                = Digest::MD5.hexdigest(body)
-        size                = body.size
+        # validate content_length.
+        unless env['CONTENT_LENGTH']
+          status 411
+          return builder(:missing_content_length)
+        end
+
+        # valid content_length error.
+        content_length = Integer(env['CONTENT_LENGTH']) rescue (return 400, nil)
+
+        # get request headers.
         expect              = env['HTTP_EXPECT']
         expires             = env['HTTP_EXPIRES']
         content_type        = env['CONTENT_TYPE'] || "binary/octet-stream"
-        content_length      = env['CONTENT_LENGTH']
         @content_md5        = env['HTTP_CONTENT_MD5']
         cache_control       = env['HTTP_CACHE_CONTROL']
         content_encoding    = env['HTTP_CONTENT_ENCODING']
         content_disposition = env['HTTP_CONTENT_DISPOSITION']
 
-        # validate content_length
-        unless content_length
-          return 411, {"Content-Type" => "application/xml"}, builder(:missing_content_length)
-        end
-
-        # valid content_length error
-        content_length = Integer(env['CONTENT_LENGTH']) rescue (return 400, nil)
-
-        # trancate request body by content_length
-        if content_length.to_i < size.to_i
-          size = content_length
-          request.body.truncate(size)
-        end
+        # set object value
+        body = request.body.read content_length
+        etag = Digest::MD5.hexdigest(body)
+        size = body.size
 
         # validate content-MD5
-        if @content_md5 and @content_md5 != etag
-          return 400, builder(:invalid_digest)
+        if @content_md5 and Base64.decode64(@content_md5).chomp != Digest::MD5.digest(body)
+          status 400
+          return builder(:invalid_digest)
         end
+
+        # create last_modified time.
+        last_modified = DependencyInjector.time_now.utc.iso8601
 
         # get and create basket from database.
         if (obj = S3Object.find_by_basket_type_and_path(basket_type, key))
@@ -180,7 +187,7 @@ module S3Adapter
 
         # create basket to castoro.
         size = 0
-        Adapter.put_basket_file(basket, request.body) { |readed_size|
+        Adapter.put_basket_file(basket, request.body, content_length) { |readed_size|
           size += readed_size
         }
 
@@ -190,17 +197,17 @@ module S3Adapter
       end
 
       def copy_object bucket, key
-        hs = {"Content-Type" => "application/xml"}
-
         # check bucket name.
         unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
-          return 404, hs, builder(:no_such_bucket)
+          status 404
+          return builder(:no_such_bucket)
         end
 
         # check authorization.
         unless env["s3adapter.authorization"]
           @message = "Anonymous users cannot copy objects.  Please authenticate."
-          return 403, hs, builder(:access_denied)
+          status 403
+          return builder(:access_denied)
         end
 
         # set object value.
@@ -216,14 +223,16 @@ module S3Adapter
         if (content_length and (content_length.to_i > 0))
           @message = "Your request was too big."
           @max_message_length_bytes = 0
-          return 400, hs, builder(:max_message_length_exceeded)
+          status 400
+          return builder(:max_message_length_exceeded)
         end
 
         # validate copy source.
         unless env["HTTP_X_AMZ_COPY_SOURCE"] =~ %r{^/(.*?)/(.+)$}
           @message = "Copy Source must mention the source bucket and key: sourcebucket/sourcekey"
           @argument_name = "x-amz-copy-source"
-          return 400, hs, builder(:invalid_argument)
+          status 400
+          return builder(:invalid_argument)
         else
           source_bucket = env["HTTP_X_AMZ_COPY_SOURCE"].split("/", 3)[1]
           source_key    = env["HTTP_X_AMZ_COPY_SOURCE"].split("/", 3)[2]
@@ -233,22 +242,26 @@ module S3Adapter
         if source_bucket == @bucket and source_key == key
           if env["HTTP_X_AMZ_METADATA_DIRECTIVE"] and env["HTTP_X_AMZ_METADATA_DIRECTIVE"] == "REPLACE"
             @message = "Access Denied"
-            return 403, hs, builder(:access_denied)
+            status 403
+            return builder(:access_denied)
           end
           @message = "The Source and Destination may not be the same when the MetadataDirective is Copy and storage class unspecified"
-          return 400, hs, builder(:invalid_request)
+          status 400
+          return builder(:invalid_request)
         end
 
         # check source bucket name.
         unless (source_basket_type = (S3CONFIG["buckets"][source_bucket] || {})["basket_type"])
           @bucket = source_bucket
-          return 404, hs, builder(:no_such_bucket)
+          status 404
+          return builder(:no_such_bucket)
         end
 
         # get basket from database.
         unless (source_obj = S3Object.active.find_by_basket_type_and_path(source_basket_type, source_key))
           @key = source_key
-          return 404, hs, builder(:no_such_key)
+          status 404
+          return builder(:no_such_key)
         end
 
         source_last_modified = Time.parse(source_obj.last_modified)
@@ -256,7 +269,8 @@ module S3Adapter
         # get file from castoro.
         unless (source_file = Adapter.get_basket_file(source_obj.to_basket))
           @key = source_key
-          return 404, hs, builder(:no_such_key)
+          status 404
+          return builder(:no_such_key)
         end
 
         modified_since   = Time.httpdate(env["HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE"]) rescue nil
@@ -265,27 +279,32 @@ module S3Adapter
         # check x_amz_copy_source_if_unmodified_since.
         if unmodified_since and unmodified_since < source_last_modified
           @condition = 'x-amz-copy-source-If-Unmodified-Since'
-          return 412, hs, builder(:precondition_failed)
+          status 412
+          return builder(:precondition_failed)
         end
 
         # check x_amz_copy_source_if_match.
         if env["HTTP_X_AMZ_COPY_SOURCE_IF_MATCH"] and source_obj.etag != env["HTTP_X_AMZ_COPY_SOURCE_IF_MATCH"].gsub("\"", "")
           @condition = 'x-amz-copy-source-If-Match'
-          return 412, hs, builder(:precondition_failed)
+          status 412
+          return builder(:precondition_failed)
         end
 
         # check x_amz_copy_source_if_none_match and x_amz_copy_source_if_modified_since.
         if env["HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH"] and modified_since
           if source_obj.etag == env["HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH"].gsub("\"", "") and source_last_modified <= modified_since
             @condition = 'x-amz-copy-source-If-Modified-Since'
-            return 412, hs, builder(:precondition_failed)
+            status 412
+            return builder(:precondition_failed)
           end
         elsif env["HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH"] and source_obj.etag == env["HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH"].gsub("\"", "")
           @condition = 'x-amz-copy-source-If-None-Match'
-          return 412, hs, builder(:precondition_failed)
+          status 412
+          return builder(:precondition_failed)
         elsif modified_since and source_last_modified <= modified_since
           @condition = 'x-amz-copy-source-If-Modified-Since'
-          return 412, hs, builder(:precondition_failed)
+          status 412
+          return builder(:precondition_failed)
         end
 
         # get source file.
@@ -332,11 +351,12 @@ module S3Adapter
         basket = obj.to_basket
 
         # create basket to castoro.
-        Adapter.put_basket_file(basket, content)
+        Adapter.put_basket_file(basket, content, source_obj.size)
 
         @last_modified = last_modified
         @etag = source_obj.etag
-        return 200, hs, builder(:copy_object_result)
+        status 200
+        return builder(:copy_object_result)
       end
 
     end

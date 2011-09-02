@@ -118,6 +118,7 @@ describe 'GET Object' do
     end
 
     it "should return response header." do
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
       last_response.header["server"].should == "AmazonS3"
     end
 
@@ -143,7 +144,8 @@ describe 'GET Object' do
     end
 
     it "should return response header." do
-      last_response.header["server"].should == "AmazonS3"
+      last_response.header["content-type"].should == "application/xml;charset=utf-8"
+      last_response.header["server"].should       == "AmazonS3"
     end
 
     it "should return NoSuchKey response body." do
@@ -169,8 +171,9 @@ describe 'GET Object' do
       end
 
       it "should return override specified cache-control of response headers." do
+        last_response.header["content-type"].should  == "application/octet-stream"
         last_response.header["cache-control"].should == "hoge.cache-control"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should        == "AmazonS3"
       end
 
       it "should return specified object value." do
@@ -190,8 +193,9 @@ describe 'GET Object' do
       end
 
       it "should return override specified content-disposition of response headers." do
+        last_response.header["content-type"].should        == "application/octet-stream"
         last_response.header["content-disposition"].should == "attachment;filename=hoge-disposition.txt"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should              == "AmazonS3"
       end
 
       it "should return specified object value." do
@@ -211,8 +215,9 @@ describe 'GET Object' do
       end
 
       it "should return specified content-encoding of response headers." do
+        last_response.header["content-type"].should     == "application/octet-stream"
         last_response.header["content-encoding"].should == "hoge.encoding"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should           == "AmazonS3"
       end
 
       it "should return specified object value." do
@@ -232,8 +237,9 @@ describe 'GET Object' do
       end
 
       it "should return override specified content-language of response headers." do
+        last_response.header["content-type"].should     == "application/octet-stream"
         last_response.header["content-language"].should == "hoge.language"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should           == "AmazonS3"
       end
 
       it "should return specified object value." do
@@ -254,7 +260,7 @@ describe 'GET Object' do
 
       it "should return override specified content-type of response headers." do
         last_response.header["content-type"].should == "hoge.content-type"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value." do
@@ -274,8 +280,9 @@ describe 'GET Object' do
       end
 
       it "should return override specified expires of response headers." do
-        last_response.header["expires"].should == "hoge-expires"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/octet-stream"
+        last_response.header["expires"].should      == "hoge-expires"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value." do
@@ -306,7 +313,7 @@ describe 'GET Object' do
         last_response.header["content-language"].should    == "hoge.language"
         last_response.header["content-type"].should        == "hoge.content-type"
         last_response.header["expires"].should             == "hoge-expires"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should              == "AmazonS3"
       end
 
       it "should return specified object value." do
@@ -343,7 +350,7 @@ describe 'GET Object' do
         last_response.header["content-language"].should    == "hoge.language"
         last_response.header["content-type"].should        == "hoge.content-type"
         last_response.header["expires"].should             == "hoge-expires"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should              == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -373,7 +380,7 @@ describe 'GET Object' do
         last_response.header["content-type"].should   == "application/octet-stream"
         last_response.header["content-range"].should  == "bytes 0-2/4"
         last_response.header["accept-ranges"].should  == "bytes"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should         == "AmazonS3"
       end
 
       it "should return specified range object value response body." do
@@ -395,7 +402,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/octet-stream"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -417,7 +425,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return InvalidRange response body." do
@@ -446,7 +455,7 @@ describe 'GET Object' do
 
       it "should return content-range response headers." do
         last_response.header["content-range"].should == "bytes 3-3/4"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should        == "AmazonS3"
       end
 
       it "should return specified range object value response body." do
@@ -468,7 +477,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/octet-stream"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -534,7 +544,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return PreconditionFailed response body." do
@@ -561,7 +572,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/octet-stream"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -605,7 +617,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/octet-stream"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -627,7 +640,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return PreconditionFailed response body." do
@@ -654,7 +668,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/octet-stream"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -705,7 +720,7 @@ describe 'GET Object' do
 
       it "should return content-range response headers." do
         last_response.header["content-range"].should == "bytes 0-2/4"
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["server"].should        == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -733,7 +748,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it 'should return PreconditionaFailed response body.' do
@@ -763,7 +779,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/octet-stream"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -788,7 +805,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/octet-stream"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return specified object value response body." do
@@ -809,7 +827,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return InvalidRequest response body." do
@@ -832,7 +851,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return InvalidRequest response body." do
@@ -855,7 +875,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return InvalidRequest response body." do
@@ -878,7 +899,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return InvalidRequest response body." do
@@ -901,7 +923,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return InvalidRequest response body." do
@@ -924,7 +947,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return InvalidRequest response body." do
@@ -952,7 +976,8 @@ describe 'GET Object' do
       end
 
       it "should return response header." do
-        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+        last_response.header["server"].should       == "AmazonS3"
       end
 
       it "should return InvalidRequest response body." do
