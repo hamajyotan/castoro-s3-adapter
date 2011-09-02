@@ -166,6 +166,7 @@ module S3Adapter
           obj.cache_control       = cache_control if cache_control
           obj.content_encoding    = content_encoding if content_encoding
           obj.content_disposition = content_disposition if content_disposition
+          obj.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
           obj.deleted             = false
         else
           obj = S3Object.create { |o|
@@ -180,6 +181,7 @@ module S3Adapter
             o.cache_control       = cache_control if cache_control
             o.content_encoding    = content_encoding if content_encoding
             o.content_disposition = content_disposition if content_disposition
+            o.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
           }
         end
         obj.save
@@ -331,6 +333,7 @@ module S3Adapter
           obj.cache_control       = cache_control if cache_control
           obj.content_encoding    = content_encoding if content_encoding
           obj.content_disposition = content_disposition if content_disposition
+          obj.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
           obj.deleted             = false
         else
           obj = S3Object.create { |o|
@@ -345,6 +348,7 @@ module S3Adapter
             o.cache_control       = cache_control if cache_control
             o.content_encoding    = content_encoding if content_encoding
             o.content_disposition = content_disposition if content_disposition
+            o.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
           }
         end
         obj.save
@@ -413,12 +417,24 @@ module S3Adapter
       cs << "path like :prefix" unless @prefix.to_s.empty?
       cs << "path > :marker" unless @marker.to_s.empty?
       objects = S3Object.active.find(:all, :conditions => [cs.join(" and "), {:prefix => @prefix.to_s + '%', :marker => @marker.to_s}])
+      accounts = {}
       @contents = objects.map { |o|
+        if accounts[o.owner_access_key].nil?
+          if u = User.find_by_access_key_id(o.owner_access_key)
+            accounts[o.owner_access_key] = {
+              :id => o.owner_access_key,
+              :display_name => u.display_name,
+            }
+          else
+            accounts[o.owner_access_key] = false
+          end
+        end
         {
           :key => o.path,
           :last_modified => o.last_modified,
           :etag => o.etag,
           :size => o.size,
+          :owner => accounts[o.owner_access_key],
           :storage_class => "STANDARD",
         }
       }

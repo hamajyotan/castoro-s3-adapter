@@ -16,6 +16,7 @@ class S3Object < ActiveRecord::Base
     :content_encoding,
     :content_disposition,
     :cache_control,
+    :owner_access_key,
   ]
 
   accessors.each { |m|

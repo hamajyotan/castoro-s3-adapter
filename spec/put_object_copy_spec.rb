@@ -24,35 +24,50 @@ describe 'PUT Object Copy' do
       }
     }
 
-    S3Object.delete_all
-    S3Object.new { |o|
-      o.basket_type   = 999
-      o.path          = "foo/bar/baz.txt"
-      o.id            = 1
-      o.basket_rev    = 1
-      o.last_modified = "2011-07-21T19:14:36+09:00"
-      o.etag          = "ea703e7aa1efda0064eaa507d9e8ab7e"
-      o.size          = 4
-      o.content_type  = "application/octet-stream"
-      o.save
-    }
-    S3Object.new { |o|
-      o.basket_type   = 1000
-      o.path          = "hoge/fuga/piyo.txt"
-      o.id            = 2
-      o.basket_rev    = 1
-      o.last_modified = "2011-05-13T14:43:24+09:00"
-      o.etag          = "02ccdb34c1f7a8c84b72e003ddd77173"
-      o.size          = 8
-      o.content_type  = "text/plain"
-      o.save
+    @users = {
+      'test_user1' => {
+        'access-key-id' => 'XXXXXXXXXXXXXXXXXXXX',
+        'secret-access-key' => 'AStringOfSecretAccessKey',
+      },
+      'test_user2' => {
+        'access-key-id' => 'AStringOfAccessKeyId',
+        'secret-access-key' => 'VeryVeryVerySecretAccessKey',
+      },
     }
     User.delete_all
-    User.new { |u|
-      u.display_name     = "s3adapter_user"
-      @access_key_id     = u.access_key_id     = "XXXXXXXXXXXXXXXXXXXX"
-      @secret_access_key = u.secret_access_key = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-      u.save
+    @users.each { |k,v|
+      User.new { |u|
+        u.access_key_id     = v['access-key-id']
+        u.secret_access_key = v['secret-access-key']
+        u.display_name = k
+        u.save
+      }
+    }
+
+    S3Object.delete_all
+    S3Object.new { |o|
+      o.basket_type      = 999
+      o.path             = "foo/bar/baz.txt"
+      o.id               = 1
+      o.basket_rev       = 1
+      o.last_modified    = "2011-07-21T19:14:36+09:00"
+      o.etag             = "ea703e7aa1efda0064eaa507d9e8ab7e"
+      o.size             = 4
+      o.content_type     = "application/octet-stream"
+      o.owner_access_key = "XXXXXXXXXXXXXXXXXXXX"
+      o.save
+    }
+    S3Object.new { |o|
+      o.basket_type      = 1000
+      o.path             = "hoge/fuga/piyo.txt"
+      o.id               = 2
+      o.basket_rev       = 1
+      o.last_modified    = "2011-05-13T14:43:24+09:00"
+      o.etag             = "02ccdb34c1f7a8c84b72e003ddd77173"
+      o.size             = 8
+      o.content_type     = "text/plain"
+      o.owner_access_key = "AStringOfAccessKeyId"
+      o.save
     }
 
   end
@@ -68,8 +83,9 @@ describe 'PUT Object Copy' do
     before do
       path = "/castoro/foo/bar/baz_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" }
-      signature = aws_signature(@secret_access_key, "PUT", path, headers)
-      headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+      @user = 'test_user1'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz_copy.txt') { |obj| obj.basket_rev } || 0
       put path, nil, headers
     end
@@ -91,13 +107,14 @@ describe 'PUT Object Copy' do
 
     it "should store copied object record." do
       find_by_bucket_and_path('castoro', 'foo/bar/baz_copy.txt') { |obj|
-        obj.basket_type.should   == 999
-        obj.path.should          == "foo/bar/baz_copy.txt"
-        obj.basket_rev.should    == @rev + 1
-        obj.last_modified.should == "2011-08-26T01:14:09Z"
-        obj.etag.should          == "ea703e7aa1efda0064eaa507d9e8ab7e"
-        obj.size.should          == 4
-        obj.content_type.should  == "application/octet-stream"
+        obj.basket_type.should      == 999
+        obj.path.should             == "foo/bar/baz_copy.txt"
+        obj.basket_rev.should       == @rev + 1
+        obj.last_modified.should    == "2011-08-26T01:14:09Z"
+        obj.etag.should             == "ea703e7aa1efda0064eaa507d9e8ab7e"
+        obj.size.should             == 4
+        obj.content_type.should     == "application/octet-stream"
+        obj.owner_access_key.should == "XXXXXXXXXXXXXXXXXXXX"
       }
     end
 
@@ -113,8 +130,9 @@ describe 'PUT Object Copy' do
     before do
       path = "/test/hoge/fuga/piyo_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/test/hoge/fuga/piyo.txt" }
-      signature = aws_signature(@secret_access_key, "PUT", path, headers)
-      headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+      @user = 'test_user1'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
     end
 
@@ -138,8 +156,9 @@ describe 'PUT Object Copy' do
     before do
       path = "/castoro/hoge/fuga/piyo_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/test/hoge/fuga/piyo.txt" }
-      signature = aws_signature(@secret_access_key, "PUT", path, headers)
-      headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+      @user = 'test_user2'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       @rev = find_by_bucket_and_path('castoro', 'hoge/fuga/piyo_copy.txt') { |obj| obj.basket_rev } || 0
       put path, nil, headers
     end
@@ -161,13 +180,14 @@ describe 'PUT Object Copy' do
 
     it "should store copied object record." do
       find_by_bucket_and_path('castoro', 'hoge/fuga/piyo_copy.txt') { |obj|
-        obj.basket_type.should    == 999
-        obj.path.should           == "hoge/fuga/piyo_copy.txt"
-        obj.basket_rev.should     == @rev + 1
-        obj.last_modified.should  == "2011-08-26T01:14:09Z"
-        obj.etag.should           == "02ccdb34c1f7a8c84b72e003ddd77173"
-        obj.size.should           == 8
-        obj.content_type.should   == "text/plain"
+        obj.basket_type.should      == 999
+        obj.path.should             == "hoge/fuga/piyo_copy.txt"
+        obj.basket_rev.should       == @rev + 1
+        obj.last_modified.should    == "2011-08-26T01:14:09Z"
+        obj.etag.should             == "02ccdb34c1f7a8c84b72e003ddd77173"
+        obj.size.should             == 8
+        obj.content_type.should     == "text/plain"
+        obj.owner_access_key.should == "AStringOfAccessKeyId"
       }
     end
 
@@ -182,8 +202,11 @@ describe 'PUT Object Copy' do
   context "no given x-amz-copy-source headers" do
     before(:all) do
       path = "/castoro/foo/bar/baz_copy.txt"
-      signature = aws_signature(@secret_access_key, "PUT", path, {})
-      put path, nil, "HTTP_AUTHORIZATION" => "AWS #{@access_key_id}:#{signature}"
+      headers = {}
+      @user = 'test_user1'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+      put path, nil, headers
     end
 
     it "should return response code 411." do
@@ -208,8 +231,9 @@ describe 'PUT Object Copy' do
     before(:all) do
       path = "/castoro/foo/bar/baz_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => nil }
-      signature = aws_signature(@secret_access_key, "PUT", path, headers)
-      headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+      @user = 'test_user1'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
     end
 
@@ -237,8 +261,9 @@ describe 'PUT Object Copy' do
     before(:all) do
       path = "/castoro/foo/bar/baz_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/no_exist_bucket/foo/bar/baz.txt" }
-      signature = aws_signature(@secret_access_key, "PUT", path, headers)
-      headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+      @user = 'test_user1'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
     end
 
@@ -265,8 +290,9 @@ describe 'PUT Object Copy' do
     before(:all) do
       path = "/castoro/foo/bar/baz_copy.txt"
       headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/no_exist_key" }
-      signature = aws_signature(@secret_access_key, "PUT", path, headers)
-      headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+      @user = 'test_user1'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
     end
 
@@ -302,8 +328,9 @@ describe 'PUT Object Copy' do
           "CONTENT_TYPE"                  => "application/pdf",
           "HTTP_EXPIRES"                  => "1000000",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz_copy_replace.txt') { |obj| obj.basket_rev } || 0
         put path, nil, headers
       end
@@ -336,6 +363,7 @@ describe 'PUT Object Copy' do
           obj.content_encoding.should    == "gzip"
           obj.content_type.should        == "application/pdf"
           obj.expires.should             == "1000000"
+          obj.owner_access_key.should    == "XXXXXXXXXXXXXXXXXXXX"
         }
       end
 
@@ -353,8 +381,9 @@ describe 'PUT Object Copy' do
           "CONTENT_TYPE"                  => "application/pdf",
           "HTTP_EXPIRES"                  => "1000000",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz_copy_directive.txt') { |obj| obj.basket_rev } || 0
         put path, nil, headers
       end
@@ -376,13 +405,14 @@ describe 'PUT Object Copy' do
 
       it "should store copied object record." do
         find_by_bucket_and_path('castoro', 'foo/bar/baz_copy_directive.txt') { |obj|
-          obj.basket_type.should   == 999
-          obj.path.should          == "foo/bar/baz_copy_directive.txt"
-          obj.basket_rev.should    == @rev + 1
-          obj.last_modified.should == "2011-08-26T01:14:09Z"
-          obj.etag.should          == "ea703e7aa1efda0064eaa507d9e8ab7e"
-          obj.size.should          == 4
-          obj.content_type.should  == "application/octet-stream"
+          obj.basket_type.should      == 999
+          obj.path.should             == "foo/bar/baz_copy_directive.txt"
+          obj.basket_rev.should       == @rev + 1
+          obj.last_modified.should    == "2011-08-26T01:14:09Z"
+          obj.etag.should             == "ea703e7aa1efda0064eaa507d9e8ab7e"
+          obj.size.should             == 4
+          obj.content_type.should     == "application/octet-stream"
+          obj.owner_access_key.should == "XXXXXXXXXXXXXXXXXXXX"
           obj.cache_control.should be_nil
           obj.content_disposition.should be_nil
           obj.content_encoding.should be_nil
@@ -399,8 +429,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"          => "/castoro/foo/bar/baz.txt" ,
           "HTTP_X_AMZ_COPY_SOURCE_IF_MATCH" => "ea703e7aa1efda0064eaa507d9e8ab7e",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -427,8 +458,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"          => "/castoro/foo/bar/baz.txt" ,
           "HTTP_X_AMZ_COPY_SOURCE_IF_MATCH" => "02ccdb34c1f7a8c84b72e003ddd77173",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -458,8 +490,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"               => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH" => "02ccdb34c1f7a8c84b72e003ddd77173",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -486,8 +519,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"               => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH" => "ea703e7aa1efda0064eaa507d9e8ab7e",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -517,8 +551,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"                   => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Fri, 15 Jul 2011 01:14:09 GMT",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -545,8 +580,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"                   => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Thu, 21 Jul 2011 19:14:36 GMT",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -576,8 +612,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"                   => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Fri, 26 Aug 2011 01:14:09 GMT",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -607,8 +644,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"                     => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_UNMODIFIED_SINCE" => "Fri, 15 Jul 2011 01:14:09 GMT",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -638,8 +676,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"                     => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_UNMODIFIED_SINCE" => "Thu, 21 Jul 2011 19:14:36 GMT",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -666,8 +705,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"                     => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_UNMODIFIED_SINCE" => "Fri, 26 Aug 2011 01:14:09 GMT",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -695,8 +735,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Fri, 15 Jul 2011 01:14:09 GMT",
           "HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH"     => "ea703e7aa1efda0064eaa507d9e8ab7e",
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -724,8 +765,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Fri, 15 Jul 2011 01:14:09 GMT",
           "HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH"     => "02ccdb34c1f7a8c84b72e003ddd77173"
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -752,8 +794,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" ,
           "CONTENT_LENGTH"         => 1,
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -783,8 +826,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" ,
           "CONTENT_LENGTH"         => 1,
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -814,8 +858,9 @@ describe 'PUT Object Copy' do
       before(:all) do
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz_copy.txt" }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 
@@ -844,8 +889,9 @@ describe 'PUT Object Copy' do
           "HTTP_X_AMZ_COPY_SOURCE"        => "/castoro/foo/bar/baz_copy.txt",
           "HTTP_X_AMZ_METADATA_DIRECTIVE" => "REPLACE"
         }
-        signature = aws_signature(@secret_access_key, "PUT", path, headers)
-        headers["HTTP_AUTHORIZATION"] = "AWS #{@access_key_id}:#{signature}"
+        @user = 'test_user1'
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
       end
 

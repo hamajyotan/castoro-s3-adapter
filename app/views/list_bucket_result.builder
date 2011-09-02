@@ -14,6 +14,10 @@ xml.ListBucketResult :xmlns => "http://s3.amazonaws.com/doc/2006-03-01/" do
       xml.LastModified  content[:last_modified]
       xml.ETag          """#{content[:etag]}"""
       xml.Size          content[:size]
+      xml.Owner do
+        xml.ID          content[:owner][:id]
+        xml.DisplayName content[:owner][:display_name]       
+      end if content[:owner]
       xml.StorageClass  content[:storage_class]
     end
   }

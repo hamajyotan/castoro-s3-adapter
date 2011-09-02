@@ -9,6 +9,25 @@ describe 'PUT Object' do
   include Rack::Test::Methods
 
   before(:all) do
+    @users = {
+      'test_user1' => {
+        'access-key-id' => 'XXXXXXXXXXXXXXXXXXXX',
+        'secret-access-key' => 'AStringOfSecretAccessKey',
+      },
+      'test_user2' => {
+        'access-key-id' => 'AStringOfAccessKeyId',
+        'secret-access-key' => 'VeryVeryVerySecretAccessKey',
+      },
+    }
+    User.delete_all
+    @users.each { |k,v|
+      User.new { |u|
+        u.access_key_id     = v['access-key-id']
+        u.secret_access_key = v['secret-access-key']
+        u.display_name = k
+        u.save
+      }
+    }
 
     FileUtils.rm_r S3Adapter::Adapter::BASE if File.exists?(S3Adapter::Adapter::BASE)
     FileUtils.mkdir_p S3Adapter::Adapter::BASE
@@ -25,8 +44,13 @@ describe 'PUT Object' do
 
   context "given bucketname and objectkey(hoge/fuga/piyo.txt)" do
     before do
+      path = '/castoro/hoge/fuga/piyo.txt'
       @rev = find_by_bucket_and_path('castoro', 'hoge/fuga/piyo.txt') { |obj| obj.basket_rev } || 0
-      put "/castoro/hoge/fuga/piyo.txt", "abcd", "CONTENT_LENGTH" => "4"
+      headers = {"CONTENT_LENGTH" => "4"}
+      @user = 'test_user1'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+      put path, "abcd", headers
     end
 
     it "should return response code 200." do
@@ -44,13 +68,14 @@ describe 'PUT Object' do
 
     it "should store object record." do
       find_by_bucket_and_path('castoro', 'hoge/fuga/piyo.txt') { |obj|
-        obj.basket_type.should   == 999
-        obj.path.should          == "hoge/fuga/piyo.txt"
-        obj.basket_rev.should    == @rev + 1
-        obj.last_modified.should == "2011-08-26T01:14:09Z"
-        obj.etag.should          == "e2fc714c4727ee9395f324cd2e7f331f"
-        obj.size.should          == 4
-        obj.content_type.should  == "binary/octet-stream"
+        obj.basket_type.should      == 999
+        obj.path.should             == "hoge/fuga/piyo.txt"
+        obj.basket_rev.should       == @rev + 1
+        obj.last_modified.should    == "2011-08-26T01:14:09Z"
+        obj.etag.should             == "e2fc714c4727ee9395f324cd2e7f331f"
+        obj.size.should             == 4
+        obj.content_type.should     == "binary/octet-stream"
+        obj.owner_access_key.should == "XXXXXXXXXXXXXXXXXXXX"
       }
     end
 
@@ -64,9 +89,18 @@ describe 'PUT Object' do
 
   context "override the same objectkey(foo/bar/baz.txt)" do
     before do
-      put "/castoro/foo/bar/baz.txt", "abcd", "CONTENT_LENGTH" => "4"
+      path = "/castoro/foo/bar/baz.txt"
+      headers = {"CONTENT_LENGTH" => "4"}
+      @user = 'test_user1'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+      put path, "abcd", headers
       @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.basket_rev } || 0
-      put "/castoro/foo/bar/baz.txt", "01234567", "CONTENT_LENGTH" => "8"
+      headers = {"CONTENT_LENGTH" => "8"}
+      @user = 'test_user2'
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+      put path, "01234567", headers
     end
 
     it "should return response code 200." do
@@ -84,13 +118,14 @@ describe 'PUT Object' do
 
     it "should store object record." do
       find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj|
-        obj.basket_type.should   == 999
-        obj.path.should          == "foo/bar/baz.txt"
-        obj.basket_rev.should    == @rev + 1
-        obj.last_modified.should == "2011-08-26T01:14:09Z"
-        obj.etag.should          == "2e9ec317e197819358fbc43afca7d837"
-        obj.size.should          == 8
-        obj.content_type.should  == "binary/octet-stream"
+        obj.basket_type.should      == 999
+        obj.path.should             == "foo/bar/baz.txt"
+        obj.basket_rev.should       == @rev + 1
+        obj.last_modified.should    == "2011-08-26T01:14:09Z"
+        obj.etag.should             == "2e9ec317e197819358fbc43afca7d837"
+        obj.size.should             == 8
+        obj.content_type.should     == "binary/octet-stream"
+        obj.owner_access_key.should == "AStringOfAccessKeyId"
       }
     end
 

@@ -9,6 +9,25 @@ describe 'GET Bucket' do
   include Rack::Test::Methods
 
   before(:all) do
+    @users = {
+      'test_user1' => {
+        'access-key-id' => 'XXXXXXXXXXXXXXXXXXXX',
+        'secret-access-key' => 'AStringOfSecretAccessKey',
+      },
+      'test_user2' => {
+        'access-key-id' => 'AStringOfAccessKeyId',
+        'secret-access-key' => 'VeryVeryVerySecretAccessKey',
+      },
+    }
+    User.delete_all
+    @users.each { |k,v|
+      User.new { |u|
+        u.access_key_id = v['access-key-id']
+        u.secret_access_key = v['secret-access-key']
+        u.display_name = k
+        u.save
+      }
+    }
     S3Object.delete_all
     S3Object.new { |o|
       o.basket_type = 999
@@ -19,6 +38,7 @@ describe 'GET Bucket' do
       o.etag = "ea703e7aa1efda0064eaa507d9e8ab7e"
       o.size = 4
       o.content_type = "application/octet-stream"
+      o.owner_access_key = "XXXXXXXXXXXXXXXXXXXX"
       o.save
     }
     S3Object.new { |o|
@@ -30,6 +50,7 @@ describe 'GET Bucket' do
       o.etag = "73feffa4b7f6bb68e44cf984c85f6e88"
       o.size = 3
       o.content_type = "image/jpeg"
+      o.owner_access_key = nil # nobody
       o.save
     }
     S3Object.new { |o|
@@ -40,6 +61,7 @@ describe 'GET Bucket' do
       o.last_modified = "2011-07-22T22:22:59+09:00"
       o.etag = "8059cabc22e766aea3c60ce67a82075e"
       o.size = 8
+      o.owner_access_key = "AStringOfAccessKeyId"
       o.content_type = "image/gif"
       o.save
     }
@@ -69,15 +91,20 @@ describe 'GET Bucket' do
       xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-21T19:14:36+09:00"
       xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "ea703e7aa1efda0064eaa507d9e8ab7e"
       xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "4"
+      xml.elements["ListBucketResult/Contents[1]/Owner/ID"].text.should == "XXXXXXXXXXXXXXXXXXXX"
+      xml.elements["ListBucketResult/Contents[1]/Owner/DisplayName"].text.should == "test_user1"
       xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
       xml.elements["ListBucketResult/Contents[2]/Key"].text.should == "hoge/fuga.jpg"
       xml.elements["ListBucketResult/Contents[2]/LastModified"].text.should == "2011-07-22T21:23:41+09:00"
       xml.elements["ListBucketResult/Contents[2]/ETag"].text.should == "73feffa4b7f6bb68e44cf984c85f6e88"
       xml.elements["ListBucketResult/Contents[2]/Size"].text.should == "3"
+      xml.elements["ListBucketResult/Contents[2]/Owner"].should be_nil
       xml.elements["ListBucketResult/Contents[2]/StorageClass"].text.should == "STANDARD"
       xml.elements["ListBucketResult/Contents[3]/Key"].text.should == "hoge/piyo.gif"
       xml.elements["ListBucketResult/Contents[3]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
       xml.elements["ListBucketResult/Contents[3]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
+      xml.elements["ListBucketResult/Contents[3]/Owner/ID"].text.should == "AStringOfAccessKeyId"
+      xml.elements["ListBucketResult/Contents[3]/Owner/DisplayName"].text.should == "test_user2"
       xml.elements["ListBucketResult/Contents[3]/Size"].text.should == "8"
       xml.elements["ListBucketResult/Contents[3]/StorageClass"].text.should == "STANDARD"
       xml.elements["ListBucketResult/Contents[4]"].should be_nil
@@ -133,6 +160,8 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-21T19:14:36+09:00"
         xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "ea703e7aa1efda0064eaa507d9e8ab7e"
         xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "4"
+        xml.elements["ListBucketResult/Contents[1]/Owner/ID"].text.should == "XXXXXXXXXXXXXXXXXXXX"
+        xml.elements["ListBucketResult/Contents[1]/Owner/DisplayName"].text.should == "test_user1"
         xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[2]"].should be_nil
         xml.elements["ListBucketResult/CommonPrefixes[1]/Prefix"].text.should == "hoge/"
@@ -164,11 +193,14 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-22T21:23:41+09:00"
         xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "73feffa4b7f6bb68e44cf984c85f6e88"
         xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "3"
+        xml.elements["ListBucketResult/Contents[1]/Owner"].should be_nil
         xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[2]/Key"].text.should == "hoge/piyo.gif"
         xml.elements["ListBucketResult/Contents[2]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
         xml.elements["ListBucketResult/Contents[2]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
         xml.elements["ListBucketResult/Contents[2]/Size"].text.should == "8"
+        xml.elements["ListBucketResult/Contents[2]/Owner/ID"].text.should == "AStringOfAccessKeyId"
+        xml.elements["ListBucketResult/Contents[2]/Owner/DisplayName"].text.should == "test_user2"
         xml.elements["ListBucketResult/Contents[2]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[3]"].should be_nil
       end
@@ -198,6 +230,8 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
         xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
         xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "8"
+        xml.elements["ListBucketResult/Contents[1]/Owner/ID"].text.should == "AStringOfAccessKeyId"
+        xml.elements["ListBucketResult/Contents[1]/Owner/DisplayName"].text.should == "test_user2"
         xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[2]"].should be_nil
       end
@@ -228,11 +262,14 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-21T19:14:36+09:00"
         xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "ea703e7aa1efda0064eaa507d9e8ab7e"
         xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "4"
+        xml.elements["ListBucketResult/Contents[1]/Owner/ID"].text.should == "XXXXXXXXXXXXXXXXXXXX"
+        xml.elements["ListBucketResult/Contents[1]/Owner/DisplayName"].text.should == "test_user1"
         xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[2]/Key"].text.should == "hoge/fuga.jpg"
         xml.elements["ListBucketResult/Contents[2]/LastModified"].text.should == "2011-07-22T21:23:41+09:00"
         xml.elements["ListBucketResult/Contents[2]/ETag"].text.should == "73feffa4b7f6bb68e44cf984c85f6e88"
         xml.elements["ListBucketResult/Contents[2]/Size"].text.should == "3"
+        xml.elements["ListBucketResult/Contents[2]/Owner"].should be_nil
         xml.elements["ListBucketResult/Contents[2]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[3]"].should be_nil
       end
@@ -263,6 +300,7 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-22T21:23:41+09:00"
         xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "73feffa4b7f6bb68e44cf984c85f6e88"
         xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "3"
+        xml.elements["ListBucketResult/Contents[1]/Owner"].should be_nil
         xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[2]"].should be_nil
         xml.elements["ListBucketResult/CommonPrefixes[1]/Prefix"].text.should == "hoge/pi"
@@ -296,6 +334,7 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-22T21:23:41+09:00"
         xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "73feffa4b7f6bb68e44cf984c85f6e88"
         xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "3"
+        xml.elements["ListBucketResult/Contents[1]/Owner"].should be_nil
         xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[2]"].should be_nil
         xml.elements["ListBucketResult/CommonPrefixes[1]/Prefix"].text.should == "foo/"
@@ -356,6 +395,8 @@ describe 'GET Bucket' do
           xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-21T19:14:36+09:00"
           xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "ea703e7aa1efda0064eaa507d9e8ab7e"
           xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "4"
+          xml.elements["ListBucketResult/Contents[1]/Owner/ID"].text.should == "XXXXXXXXXXXXXXXXXXXX"
+          xml.elements["ListBucketResult/Contents[1]/Owner/DisplayName"].text.should == "test_user1"
           xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
           xml.elements["ListBucketResult/Contents[2]"].should be_nil
           xml.elements["ListBucketResult/CommonPrefixes[1]"].should be_nil
@@ -391,16 +432,21 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-21T19:14:36+09:00"
         xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "ea703e7aa1efda0064eaa507d9e8ab7e"
         xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "4"
+        xml.elements["ListBucketResult/Contents[1]/Owner/ID"].text.should == "XXXXXXXXXXXXXXXXXXXX"
+        xml.elements["ListBucketResult/Contents[1]/Owner/DisplayName"].text.should == "test_user1"
         xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[2]/Key"].text.should == "hoge/fuga.jpg"
         xml.elements["ListBucketResult/Contents[2]/LastModified"].text.should == "2011-07-22T21:23:41+09:00"
         xml.elements["ListBucketResult/Contents[2]/ETag"].text.should == "73feffa4b7f6bb68e44cf984c85f6e88"
         xml.elements["ListBucketResult/Contents[2]/Size"].text.should == "3"
+        xml.elements["ListBucketResult/Contents[2]/Owner"].should be_nil
         xml.elements["ListBucketResult/Contents[2]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[3]/Key"].text.should == "hoge/piyo.gif"
         xml.elements["ListBucketResult/Contents[3]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
         xml.elements["ListBucketResult/Contents[3]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
         xml.elements["ListBucketResult/Contents[3]/Size"].text.should == "8"
+        xml.elements["ListBucketResult/Contents[3]/Owner/ID"].text.should == "AStringOfAccessKeyId"
+        xml.elements["ListBucketResult/Contents[3]/Owner/DisplayName"].text.should == "test_user2"
         xml.elements["ListBucketResult/Contents[3]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[4]"].should be_nil
       end
