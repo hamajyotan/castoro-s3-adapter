@@ -169,9 +169,9 @@ def aws_signature secret, method, path, headers = {}
 
   msg = [
     method.upcase,
-    hs['content-md5']   || '',
-    headers['CONTENT_TYPE'] || '',
-    hs['x-amz-date']    || hs['date'] || '',
+    hs['content-md5'].to_s,
+    headers['CONTENT_TYPE'].to_s,
+    hs['x-amz-date'] ? '' : hs['date'].to_s,
   ]
 
   hs.map { |k, v|

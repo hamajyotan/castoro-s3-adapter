@@ -9,6 +9,9 @@ describe 'PUT Object' do
   include Rack::Test::Methods
 
   before(:all) do
+    FileUtils.rm_r S3Adapter::Adapter::BASE if File.exists?(S3Adapter::Adapter::BASE)
+    FileUtils.mkdir_p S3Adapter::Adapter::BASE
+
     @users = {
       'test_user1' => {
         'access-key-id' => 'XXXXXXXXXXXXXXXXXXXX',
@@ -29,27 +32,89 @@ describe 'PUT Object' do
       }
     }
 
-    FileUtils.rm_r S3Adapter::Adapter::BASE if File.exists?(S3Adapter::Adapter::BASE)
-    FileUtils.mkdir_p S3Adapter::Adapter::BASE
-
     S3Object.delete_all
+    @time = Time.now
   end
 
-  before do
+  before(:each) do # mock cannot be used by before(:all).
     @time_mock = mock(Time)
     S3Adapter::DependencyInjector.stub!(:time_now).with(no_args).and_return { @time_mock }
-    @time_mock.stub!(:utc).and_return { @time_mock }
-    @time_mock.stub!(:iso8601).and_return { '2011-08-26T01:14:09Z' }
+    @time_mock.stub!(:utc).and_return { @time.utc }
+    @time_mock.stub!(:iso8601).and_return { @time.iso8601 }
+  end
+
+  context 'given invalid access_key_id of authorization header' do
+    before(:all) do
+      @user = 'test_user1'
+      path = "/castoro/foo/bar/baz.txt"
+      headers = {}
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS invalid_access_key_id:#{signature}"
+      put path, "abcd", headers
+    end
+
+    it 'should return code 403' do
+      last_response.status.should == 403
+    end
+
+    it 'should return response headers' do
+      last_response.header['server'].should       == 'AmazonS3'
+      last_response.header['content-type'].should == 'application/xml;charset=utf-8'
+    end
+
+    it 'should return InvalidAccessKeyId response body' do
+      xml = REXML::Document.new last_response.body
+      xml.elements["Error/Code"].text.should == "InvalidAccessKeyId"
+      xml.elements["Error/Message"].text.should == "The AWS Access Key Id you provided does not exist in our records."
+      xml.elements["Error/RequestId"].text.should be_nil
+      xml.elements["Error/HostId"].text.should be_nil
+      xml.elements["Error/AWSAccessKeyId"].text.should == "invalid_access_key_id"
+    end
+  end
+
+  context 'given invalid secret_access_key of authorization header' do
+    before(:each) do
+      @user = 'test_user1'
+      path = "/castoro/foo/bar/baz.txt"
+      headers = {}
+      @signature = aws_signature("invalid_secret_access_key", 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+      put path, "abcd", headers
+    end
+
+    it 'should return code 403' do
+      last_response.status.should == 403
+    end
+
+    it 'should return response headers' do
+      last_response.header['server'].should       == 'AmazonS3'
+      last_response.header['content-type'].should == 'application/xml;charset=utf-8'
+    end
+
+    it 'should return SignatureDoesNotMatch response body' do
+      xml = REXML::Document.new last_response.body
+      xml.elements["Error/Code"].text.should == "SignatureDoesNotMatch"
+      xml.elements["Error/Message"].text.should == "The request signature we calculated does not match the signature you provided. Check your key and signing method."
+      xml.elements["Error/StringToSignBytes"].text.should == "50 55 54 0a 0a 0a 0a 2f 63 61 73 74 6f 72 6f 2f 66 6f 6f 2f 62 61 72 2f 62 61 7a 2e 74 78 74"
+      xml.elements["Error/RequestId"].text.should be_nil
+      xml.elements["Error/HostId"].text.should be_nil
+      xml.elements["Error/SignatureProvided"].text.should == @signature
+      xml.elements["Error/StringToSign"].text.should == "PUT\n\n\n\n/castoro/foo/bar/baz.txt"
+      xml.elements["Error/AWSAccessKeyId"].text.should == "XXXXXXXXXXXXXXXXXXXX"
+    end
   end
 
   context "given bucketname and objectkey(hoge/fuga/piyo.txt)" do
-    before do
-      path = '/castoro/hoge/fuga/piyo.txt'
-      @rev = find_by_bucket_and_path('castoro', 'hoge/fuga/piyo.txt') { |obj| obj.basket_rev } || 0
-      headers = {"CONTENT_LENGTH" => "4"}
+    before(:each) do
       @user = 'test_user1'
+      path = '/castoro/hoge/fuga/piyo.txt'
+      headers = {
+        "HTTP_DATE"      => @time.httpdate,
+        "CONTENT_LENGTH" => "4"
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+      @rev = find_by_bucket_and_path('castoro', 'hoge/fuga/piyo.txt') { |obj| obj.basket_rev } || 0
       put path, "abcd", headers
     end
 
@@ -71,7 +136,7 @@ describe 'PUT Object' do
         obj.basket_type.should      == 999
         obj.path.should             == "hoge/fuga/piyo.txt"
         obj.basket_rev.should       == @rev + 1
-        obj.last_modified.should    == "2011-08-26T01:14:09Z"
+        obj.last_modified.should    == @time_mock.utc.iso8601
         obj.etag.should             == "e2fc714c4727ee9395f324cd2e7f331f"
         obj.size.should             == 4
         obj.content_type.should     == "binary/octet-stream"
@@ -88,18 +153,26 @@ describe 'PUT Object' do
   end
 
   context "override the same objectkey(foo/bar/baz.txt)" do
-    before do
-      path = "/castoro/foo/bar/baz.txt"
-      headers = {"CONTENT_LENGTH" => "4"}
+    before(:each) do
+      # first PUT Object
       @user = 'test_user1'
+      path = "/castoro/foo/bar/baz.txt"
+      headers = {
+        "HTTP_DATE"      => @time.httpdate,
+        "CONTENT_LENGTH" => "4"
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, "abcd", headers
-      @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.basket_rev } || 0
-      headers = {"CONTENT_LENGTH" => "8"}
+      # override PUT Object
       @user = 'test_user2'
+      headers = {
+        "HTTP_DATE"      => @time.httpdate,
+        "CONTENT_LENGTH" => "8"
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+      @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.basket_rev } || 0
       put path, "01234567", headers
     end
 
@@ -121,7 +194,7 @@ describe 'PUT Object' do
         obj.basket_type.should      == 999
         obj.path.should             == "foo/bar/baz.txt"
         obj.basket_rev.should       == @rev + 1
-        obj.last_modified.should    == "2011-08-26T01:14:09Z"
+        obj.last_modified.should    == @time_mock.utc.iso8601
         obj.etag.should             == "2e9ec317e197819358fbc43afca7d837"
         obj.size.should             == 8
         obj.content_type.should     == "binary/octet-stream"
@@ -366,8 +439,8 @@ describe 'PUT Object' do
 
         it "should return InvalidDigest response body." do
           xml = REXML::Document.new last_response.body
-          xml.elements["Error/Code"].text.should        == "InvalidDigest"
-          xml.elements["Error/Message"].text.should     == "The Content-MD5 you specified was invalid."
+          xml.elements["Error/Code"].text.should == "InvalidDigest"
+          xml.elements["Error/Message"].text.should == "The Content-MD5 you specified was invalid."
           xml.elements["Error/RequestId"].text.should be_nil
           xml.elements["Error/Content_MD5"].text.should == "hoge"
           xml.elements["Error/HostId"].text.should be_nil

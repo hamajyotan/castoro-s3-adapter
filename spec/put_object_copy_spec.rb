@@ -9,7 +9,6 @@ describe 'PUT Object Copy' do
   include Rack::Test::Methods
 
   before(:all) do
-
     FileUtils.rm_r S3Adapter::Adapter::BASE if File.exists?(S3Adapter::Adapter::BASE)
     FileUtils.mkdir_p S3Adapter::Adapter::BASE
 
@@ -69,21 +68,85 @@ describe 'PUT Object Copy' do
       o.owner_access_key = "AStringOfAccessKeyId"
       o.save
     }
-
+    @time = Time.now
   end
 
-  before do
+  before(:each) do # mock cannot be used by before(:all).
     @time_mock = mock(Time)
     S3Adapter::DependencyInjector.stub!(:time_now).with(no_args).and_return { @time_mock }
-    @time_mock.stub!(:utc).and_return { @time_mock }
-    @time_mock.stub!(:iso8601).and_return { '2011-08-26T01:14:09Z' }
+    @time_mock.stub!(:utc).and_return { @time.utc }
+    @time_mock.stub!(:iso8601).and_return { @time.iso8601 }
+  end
+
+  context 'given invalid access_key_id of authorization header' do
+    before(:all) do
+      @user = 'test_user1'
+      path = "/castoro/foo/bar/baz_copy.txt"
+      headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" }
+      signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS invalid_access_key_id:#{signature}"
+      put path, nil, headers
+    end
+
+    it 'should return code 403' do
+      last_response.status.should == 403
+    end
+
+    it 'should return response headers' do
+      last_response.header['server'].should       == 'AmazonS3'
+      last_response.header['content-type'].should == 'application/xml;charset=utf-8'
+    end
+
+    it 'should return InvalidAccessKeyId response body' do
+      xml = REXML::Document.new last_response.body
+      xml.elements["Error/Code"].text.should == "InvalidAccessKeyId"
+      xml.elements["Error/Message"].text.should == "The AWS Access Key Id you provided does not exist in our records."
+      xml.elements["Error/RequestId"].text.should be_nil
+      xml.elements["Error/HostId"].text.should be_nil
+      xml.elements["Error/AWSAccessKeyId"].text.should == "invalid_access_key_id"
+    end
+  end
+
+  context 'given invalid secret_access_key of authorization header' do
+    before(:each) do
+      @user = 'test_user1'
+      path = "/castoro/foo/bar/baz_copy.txt"
+      headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" }
+      @signature = aws_signature("invalid_secret_access_key", 'PUT', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+      put path, nil, headers
+    end
+
+    it 'should return code 403' do
+      last_response.status.should == 403
+    end
+
+    it 'should return response headers' do
+      last_response.header['server'].should       == 'AmazonS3'
+      last_response.header['content-type'].should == 'application/xml;charset=utf-8'
+    end
+
+    it 'should return SignatureDoesNotMatch response body' do
+      xml = REXML::Document.new last_response.body
+      xml.elements["Error/Code"].text.should == "SignatureDoesNotMatch"
+      xml.elements["Error/Message"].text.should == "The request signature we calculated does not match the signature you provided. Check your key and signing method."
+      xml.elements["Error/StringToSignBytes"].text.should == "50 55 54 0a 0a 0a 0a 78 2d 61 6d 7a 2d 63 6f 70 79 2d 73 6f 75 72 63 65 3a 2f 63 61 73 74 6f 72 6f 2f 66 6f 6f 2f 62 61 72 2f 62 61 7a 2e 74 78 74 0a 2f 63 61 73 74 6f 72 6f 2f 66 6f 6f 2f 62 61 72 2f 62 61 7a 5f 63 6f 70 79 2e 74 78 74"
+      xml.elements["Error/RequestId"].text.should be_nil
+      xml.elements["Error/HostId"].text.should be_nil
+      xml.elements["Error/SignatureProvided"].text.should == @signature
+      xml.elements["Error/StringToSign"].text.should == "PUT\n\n\n\nx-amz-copy-source:/castoro/foo/bar/baz.txt\n/castoro/foo/bar/baz_copy.txt"
+      xml.elements["Error/AWSAccessKeyId"].text.should == "XXXXXXXXXXXXXXXXXXXX"
+    end
   end
 
   context "given source same bucketname objectkey(/castoro/foo/bar/baz.txt)" do
-    before do
-      path = "/castoro/foo/bar/baz_copy.txt"
-      headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" }
+    before(:each) do
       @user = 'test_user1'
+      path = "/castoro/foo/bar/baz_copy.txt"
+      headers = {
+        "HTTP_DATE"              => @time.httpdate,
+        "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt"
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz_copy.txt') { |obj| obj.basket_rev } || 0
@@ -101,7 +164,7 @@ describe 'PUT Object Copy' do
 
     it "should return CopyObjectResult response body." do
       xml = REXML::Document.new last_response.body
-      xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+      xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
       xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
     end
 
@@ -110,7 +173,7 @@ describe 'PUT Object Copy' do
         obj.basket_type.should      == 999
         obj.path.should             == "foo/bar/baz_copy.txt"
         obj.basket_rev.should       == @rev + 1
-        obj.last_modified.should    == "2011-08-26T01:14:09Z"
+        obj.last_modified.should    == @time_mock.utc.iso8601
         obj.etag.should             == "ea703e7aa1efda0064eaa507d9e8ab7e"
         obj.size.should             == 4
         obj.content_type.should     == "application/octet-stream"
@@ -127,10 +190,13 @@ describe 'PUT Object Copy' do
   end
 
   context "given source same bucketname objectkey(/test/hoge/fuga/piyo.txt)" do
-    before do
-      path = "/test/hoge/fuga/piyo_copy.txt"
-      headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/test/hoge/fuga/piyo.txt" }
+    before(:each) do
       @user = 'test_user1'
+      path = "/test/hoge/fuga/piyo_copy.txt"
+      headers = {
+        "HTTP_DATE"              => @time.httpdate,
+        "HTTP_X_AMZ_COPY_SOURCE" => "/test/hoge/fuga/piyo.txt"
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
@@ -147,16 +213,19 @@ describe 'PUT Object Copy' do
 
     it "should return CopyObjectResult response body." do
       xml = REXML::Document.new last_response.body
-      xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+      xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
       xml.elements["CopyObjectResult/ETag"].text.should         == "02ccdb34c1f7a8c84b72e003ddd77173"
     end
   end
 
   context "given source other bucketname objectkey(/test/hoge/fuga/piyo.txt)" do
-    before do
-      path = "/castoro/hoge/fuga/piyo_copy.txt"
-      headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/test/hoge/fuga/piyo.txt" }
+    before(:each) do
       @user = 'test_user2'
+      path = "/castoro/hoge/fuga/piyo_copy.txt"
+      headers = {
+        "HTTP_DATE"              => @time.httpdate,
+        "HTTP_X_AMZ_COPY_SOURCE" => "/test/hoge/fuga/piyo.txt"
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       @rev = find_by_bucket_and_path('castoro', 'hoge/fuga/piyo_copy.txt') { |obj| obj.basket_rev } || 0
@@ -174,7 +243,7 @@ describe 'PUT Object Copy' do
 
     it "should return CopyObjectResult response body." do
       xml = REXML::Document.new last_response.body
-      xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+      xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
       xml.elements["CopyObjectResult/ETag"].text.should         == "02ccdb34c1f7a8c84b72e003ddd77173"
     end
 
@@ -183,7 +252,7 @@ describe 'PUT Object Copy' do
         obj.basket_type.should      == 999
         obj.path.should             == "hoge/fuga/piyo_copy.txt"
         obj.basket_rev.should       == @rev + 1
-        obj.last_modified.should    == "2011-08-26T01:14:09Z"
+        obj.last_modified.should    == @time_mock.utc.iso8601
         obj.etag.should             == "02ccdb34c1f7a8c84b72e003ddd77173"
         obj.size.should             == 8
         obj.content_type.should     == "text/plain"
@@ -201,9 +270,9 @@ describe 'PUT Object Copy' do
 
   context "no given x-amz-copy-source headers" do
     before(:all) do
-      path = "/castoro/foo/bar/baz_copy.txt"
-      headers = {}
       @user = 'test_user1'
+      path = "/castoro/foo/bar/baz_copy.txt"
+      headers = { "HTTP_DATE" => @time.httpdate }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
@@ -229,9 +298,12 @@ describe 'PUT Object Copy' do
 
   context "no given x-amz-copy-source headers value" do
     before(:all) do
-      path = "/castoro/foo/bar/baz_copy.txt"
-      headers = { "HTTP_X_AMZ_COPY_SOURCE" => nil }
       @user = 'test_user1'
+      path = "/castoro/foo/bar/baz_copy.txt"
+      headers = {
+        "HTTP_DATE"              => @time.httpdate,
+        "HTTP_X_AMZ_COPY_SOURCE" => nil
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
@@ -259,9 +331,12 @@ describe 'PUT Object Copy' do
 
   context "given no exist bucketname copy source" do
     before(:all) do
-      path = "/castoro/foo/bar/baz_copy.txt"
-      headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/no_exist_bucket/foo/bar/baz.txt" }
       @user = 'test_user1'
+      path = "/castoro/foo/bar/baz_copy.txt"
+      headers = {
+        "HTTP_DATE"              => @time.httpdate,
+        "HTTP_X_AMZ_COPY_SOURCE" => "/no_exist_bucket/foo/bar/baz.txt"
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
@@ -288,9 +363,12 @@ describe 'PUT Object Copy' do
 
   context "given no exist object copy source" do
     before(:all) do
-      path = "/castoro/foo/bar/baz_copy.txt"
-      headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/no_exist_key" }
       @user = 'test_user1'
+      path = "/castoro/foo/bar/baz_copy.txt"
+      headers = {
+        "HTTP_DATE"              => @time.httpdate,
+        "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/no_exist_key"
+      }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
       put path, nil, headers
@@ -317,10 +395,12 @@ describe 'PUT Object Copy' do
 
   describe "request headers" do
     context "given x-amz-metadata-directive specified 'REPLACE'" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy_replace.txt"
         headers = {
-          "HTTP_X_AMZ_COPY_SOURCE"        => "/castoro/foo/bar/baz.txt" ,
+          "HTTP_DATE"                     => @time.httpdate,
+          "HTTP_X_AMZ_COPY_SOURCE"        => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_METADATA_DIRECTIVE" => "REPLACE",
           "HTTP_CACHE_CONTROL"            => "no-cache",
           "HTTP_CONTENT_DISPOSITION"      => "attachment;filename=origin",
@@ -328,7 +408,6 @@ describe 'PUT Object Copy' do
           "CONTENT_TYPE"                  => "application/pdf",
           "HTTP_EXPIRES"                  => "1000000",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz_copy_replace.txt') { |obj| obj.basket_rev } || 0
@@ -346,7 +425,7 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
 
@@ -355,7 +434,7 @@ describe 'PUT Object Copy' do
           obj.basket_type.should         == 999
           obj.path.should                == "foo/bar/baz_copy_replace.txt"
           obj.basket_rev.should          == @rev + 1
-          obj.last_modified.should       == "2011-08-26T01:14:09Z"
+          obj.last_modified.should       == @time_mock.utc.iso8601
           obj.etag.should                == "ea703e7aa1efda0064eaa507d9e8ab7e"
           obj.size.should                == 4
           obj.cache_control.should       == "no-cache"
@@ -370,10 +449,12 @@ describe 'PUT Object Copy' do
     end
 
     context "given x-amz-metadata-directive specified 'COPY'" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy_directive.txt"
         headers = {
-          "HTTP_X_AMZ_COPY_SOURCE"        => "/castoro/foo/bar/baz.txt" ,
+          "HTTP_DATE"                     => @time.httpdate,
+          "HTTP_X_AMZ_COPY_SOURCE"        => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_METADATA_DIRECTIVE" => "COPY",
           "HTTP_CACHE_CONTROL"            => "no-cache",
           "HTTP_CONTENT_DISPOSITION"      => "attachment;filename=origin",
@@ -381,7 +462,6 @@ describe 'PUT Object Copy' do
           "CONTENT_TYPE"                  => "application/pdf",
           "HTTP_EXPIRES"                  => "1000000",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         @rev = find_by_bucket_and_path('castoro', 'foo/bar/baz_copy_directive.txt') { |obj| obj.basket_rev } || 0
@@ -399,7 +479,7 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
 
@@ -408,7 +488,7 @@ describe 'PUT Object Copy' do
           obj.basket_type.should      == 999
           obj.path.should             == "foo/bar/baz_copy_directive.txt"
           obj.basket_rev.should       == @rev + 1
-          obj.last_modified.should    == "2011-08-26T01:14:09Z"
+          obj.last_modified.should    == @time_mock.utc.iso8601
           obj.etag.should             == "ea703e7aa1efda0064eaa507d9e8ab7e"
           obj.size.should             == 4
           obj.content_type.should     == "application/octet-stream"
@@ -423,13 +503,14 @@ describe 'PUT Object Copy' do
     end
 
     context "given x-amz-copy-source-if-match header equal to ETag" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
-          "HTTP_X_AMZ_COPY_SOURCE"          => "/castoro/foo/bar/baz.txt" ,
+          "HTTP_DATE"                       => @time.httpdate,
+          "HTTP_X_AMZ_COPY_SOURCE"          => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MATCH" => "ea703e7aa1efda0064eaa507d9e8ab7e",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -446,19 +527,20 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
     end
 
     context "given x-amz-copy-source-if-match header not equal to ETag" do
       before(:all) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
-          "HTTP_X_AMZ_COPY_SOURCE"          => "/castoro/foo/bar/baz.txt" ,
+          "HTTP_DATE"                       => @time.httpdate,
+          "HTTP_X_AMZ_COPY_SOURCE"          => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MATCH" => "02ccdb34c1f7a8c84b72e003ddd77173",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -484,13 +566,14 @@ describe 'PUT Object Copy' do
     end
 
     context "given x-amz-copy-source-if-none-match not equal to ETag" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                            => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"               => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH" => "02ccdb34c1f7a8c84b72e003ddd77173",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -507,19 +590,20 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
     end
 
     context "given x-amz-copy-source-if-none-match equal to ETag" do
       before(:all) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                            => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"               => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH" => "ea703e7aa1efda0064eaa507d9e8ab7e",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -545,13 +629,14 @@ describe 'PUT Object Copy' do
     end
 
     context "given x-amz-copy-source-if-modified-since earlier than last-modified" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                                => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"                   => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Fri, 15 Jul 2011 01:14:09 GMT",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -568,19 +653,20 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
     end
 
     context "given x-amz-copy-source-if-modified-since equal to last-modified" do
       before(:all) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                                => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"                   => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Thu, 21 Jul 2011 19:14:36 GMT",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -607,12 +693,13 @@ describe 'PUT Object Copy' do
 
     context "given x-amz-copy-source-if-modified-since later than last-modified" do
       before(:all) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                                => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"                   => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Fri, 26 Aug 2011 01:14:09 GMT",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -639,12 +726,13 @@ describe 'PUT Object Copy' do
 
     context "given x-amz-copy-source-if-unmodified-since earlier than last-modified" do
       before(:all) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                                  => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"                     => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_UNMODIFIED_SINCE" => "Fri, 15 Jul 2011 01:14:09 GMT",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -670,13 +758,14 @@ describe 'PUT Object Copy' do
     end
 
     context "given x-amz-copy-source-if-unmodified-since equal to last-modified" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                                  => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"                     => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_UNMODIFIED_SINCE" => "Thu, 21 Jul 2011 19:14:36 GMT",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -693,19 +782,20 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
     end
 
     context "given x-amz-copy-source-if-unmodified-since later than last-modified" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                                  => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"                     => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_UNMODIFIED_SINCE" => "Fri, 26 Aug 2011 01:14:09 GMT",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -722,20 +812,21 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
     end
 
     context "given x-amz-copy-source-if-modified-since earlier than last-modified and x-amz-copy-source-if-none-match equal to the ETag" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                                => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"                   => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Fri, 15 Jul 2011 01:14:09 GMT",
           "HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH"     => "ea703e7aa1efda0064eaa507d9e8ab7e",
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -752,20 +843,21 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
     end
 
     context "given x-amz-copy-source-if-modified-since later than last-modified and x-amz-copy-source-if-none-match not equal to the ETag" do
-      before do
+      before(:each) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                                => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"                   => "/castoro/foo/bar/baz.txt",
           "HTTP_X_AMZ_COPY_SOURCE_IF_MODIFIED_SINCE" => "Fri, 15 Jul 2011 01:14:09 GMT",
           "HTTP_X_AMZ_COPY_SOURCE_IF_NONE_MATCH"     => "02ccdb34c1f7a8c84b72e003ddd77173"
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -782,19 +874,20 @@ describe 'PUT Object Copy' do
 
       it "should return CopyObjectResult response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["CopyObjectResult/LastModified"].text.should == '2011-08-26T01:14:09Z'
+        xml.elements["CopyObjectResult/LastModified"].text.should == @time_mock.utc.iso8601
         xml.elements["CopyObjectResult/ETag"].text.should         == "ea703e7aa1efda0064eaa507d9e8ab7e"
       end
     end
 
     context "given content-length header > 0" do
       before(:all) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
-          "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" ,
+          "HTTP_DATE"              => @time.httpdate,
+          "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt",
           "CONTENT_LENGTH"         => 1,
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -811,8 +904,8 @@ describe 'PUT Object Copy' do
 
       it "should return MaxMessageLengthExceeded response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["Error/Code"].text.should      == "MaxMessageLengthExceeded"
-        xml.elements["Error/Message"].text.should   == "Your request was too big."
+        xml.elements["Error/Code"].text.should    == "MaxMessageLengthExceeded"
+        xml.elements["Error/Message"].text.should == "Your request was too big."
         xml.elements["Error/RequestId"].text.should be_nil
         xml.elements["Error/HostId"].text.should be_nil
         xml.elements["Error/MaxMessageLengthBytes"].text.should == "0"
@@ -821,12 +914,13 @@ describe 'PUT Object Copy' do
 
     context "given content-length header > 0" do
       before(:all) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
-          "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt" ,
+          "HTTP_DATE"              => @time.httpdate,
+          "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz.txt",
           "CONTENT_LENGTH"         => 1,
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -843,8 +937,8 @@ describe 'PUT Object Copy' do
 
       it "should return MaxMessageLengthExceeded response body." do
         xml = REXML::Document.new last_response.body
-        xml.elements["Error/Code"].text.should      == "MaxMessageLengthExceeded"
-        xml.elements["Error/Message"].text.should   == "Your request was too big."
+        xml.elements["Error/Code"].text.should    == "MaxMessageLengthExceeded"
+        xml.elements["Error/Message"].text.should == "Your request was too big."
         xml.elements["Error/RequestId"].text.should be_nil
         xml.elements["Error/HostId"].text.should be_nil
         xml.elements["Error/MaxMessageLengthBytes"].text.should == "0"
@@ -856,9 +950,12 @@ describe 'PUT Object Copy' do
   describe "copies itself" do
     context "given self object copy source" do
       before(:all) do
-        path = "/castoro/foo/bar/baz_copy.txt"
-        headers = { "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz_copy.txt" }
         @user = 'test_user1'
+        path = "/castoro/foo/bar/baz_copy.txt"
+        headers = {
+          "HTTP_DATE"              => @time.httpdate,
+          "HTTP_X_AMZ_COPY_SOURCE" => "/castoro/foo/bar/baz_copy.txt"
+        }
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
@@ -884,12 +981,13 @@ describe 'PUT Object Copy' do
 
     context "given self object copy source and x-amz-copy-source header specified 'REPLACE'" do
       before(:all) do
+        @user = 'test_user1'
         path = "/castoro/foo/bar/baz_copy.txt"
         headers = {
+          "HTTP_DATE"                     => @time.httpdate,
           "HTTP_X_AMZ_COPY_SOURCE"        => "/castoro/foo/bar/baz_copy.txt",
           "HTTP_X_AMZ_METADATA_DIRECTIVE" => "REPLACE"
         }
-        @user = 'test_user1'
         signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
         headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
         put path, nil, headers
