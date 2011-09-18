@@ -1,7 +1,13 @@
 
 module S3Adapter
+  autoload :Acl, 's3-adapter/acl'
   autoload :Adapter, 's3-adapter/adapter'
+  autoload :Authenticator, 's3-adapter/authenticator'
   autoload :DependencyInjector, 's3-adapter/dependency_injector'
+
+  module Helper
+    autoload :AclHelper         , 's3-adapter/helper/acl_helper'
+  end
 
   module Middleware
     autoload :Authorization     , 's3-adapter/middleware/authorization'

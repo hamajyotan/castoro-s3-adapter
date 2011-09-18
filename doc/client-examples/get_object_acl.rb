@@ -5,7 +5,8 @@ options = $config.dup
 
 
 command_line { |opt|
-  opt.banner = "\nUsage:  #{File.basename($0)}  [options]"
+  opt.banner = "\nUsage:  #{File.basename($0)}  [options]  OBJECT"
+
 
   opt.on('-a [ADDRESS]', '--address', "s3-adapter address (default: #{options['address']})") { |v|
     options['address'] = v
@@ -22,6 +23,8 @@ command_line { |opt|
 
   begin
     opt.parse! ARGV
+    options['object'], = ARGV
+    raise if [options['object']].any? { |a| a.nil? }
   rescue
     puts opt.help
     exit 1
@@ -38,7 +41,7 @@ http_class = if options['proxy']
 
 http_class.start(options['address'], options['port']) { |http|
 
-  uri = "/#{options['bucket']}/?acl"
+  uri = "/#{options['bucket']}/#{options['object']}?acl"
   unless options['parameters'].empty?
     uri << '&' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
   end

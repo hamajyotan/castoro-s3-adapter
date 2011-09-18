@@ -38,17 +38,18 @@ http_class = if options['proxy']
 
 http_class.start(options['address'], options['port']) { |http|
 
-  uri = "/#{options['bucket']}/?acl"
+  uri = "/#{options['bucket']}"
   unless options['parameters'].empty?
-    uri << '&' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
+    uri << '?' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
   end
   headers = options['headers']
   if options['auth'] and not options['anonymous']
-    headers['Authorization'] = authorization_header 'GET', uri, headers, options['auth']
+    headers['Authorization'] = authorization_header 'DELETE', uri, headers, options['auth']
   end
 
-  res = http.get(uri, headers)
+  res = http.delete(uri, headers)
 
+  puts "\n[WARN]: s3-adapter has not supported DELETE Bucket yet."
   puts res.code
   res.each { |k,v| puts "\t#{k}: #{v}" }
   $stdout.write res.body

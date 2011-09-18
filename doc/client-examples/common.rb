@@ -30,6 +30,7 @@ def authorization_header method, uri, headers, auth
              h[k] = v
              h
            }
+  path << "?acl" if params.include?("acl")
   signature_params = [
                        'response-cache-control',
                        'response-content-disposition',
@@ -49,7 +50,7 @@ def authorization_header method, uri, headers, auth
     method.upcase,
     hs['content-md5'].to_s,
     hs['content-type'].to_s,
-    (hs['x-amz-date'] || hs['date']).to_s,
+    hs['x-amz-date'] ? '' : hs['date'].to_s,
   ]
 
   hs.map { |k, v|

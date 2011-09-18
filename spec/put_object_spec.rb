@@ -496,6 +496,263 @@ describe 'PUT Object' do
 
   end
 
+  describe 'x-amz-acl header' do
+    before(:all) do
+      @user = 'test_user2'
+      @path = '/castoro/foo/bar/baz.txt'
+    end
+
+    context 'not given x-amz-acl header' do
+      before(:all) do
+        headers = {
+          'HTTP_DATE'      => @time.httpdate,
+          'CONTENT_LENGTH' => '4',
+        }
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', @path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+        put @path, 'abcd', headers
+      end
+
+      it 'only AStringOfAccessKeyId is set to account' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account'].size.should == 1
+        acl['account']['AStringOfAccessKeyId'].should_not be_nil
+      end
+
+      it 'full_control is added to owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['AStringOfAccessKeyId'].should == [S3Adapter::Acl::FULL_CONTROL]
+      end
+
+      it 'authenticated is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['authenticated'].should be_nil
+      end
+
+      it 'guest is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['guest'].should be_nil
+      end
+    end
+
+    context 'private given x-amz-acl header' do
+      before(:all) do
+        headers = {
+          'HTTP_DATE'      => @time.httpdate,
+          'CONTENT_LENGTH' => '4',
+          'HTTP_X_AMZ_ACL' => 'private',
+        }
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', @path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+        put @path, 'abcd', headers
+      end
+
+      it 'only AStringOfAccessKeyId is set to account' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account'].size.should == 1
+        acl['account']['AStringOfAccessKeyId'].should_not be_nil
+      end
+
+      it 'full_control is added to owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['AStringOfAccessKeyId'].should == [S3Adapter::Acl::FULL_CONTROL]
+      end
+
+      it 'authenticated is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['authenticated'].should be_nil
+      end
+
+      it 'guest is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['guest'].should be_nil
+      end
+    end
+
+    context 'public-read given x-amz-acl header' do
+      before(:all) do
+        headers = {
+          'HTTP_DATE'      => @time.httpdate,
+          'CONTENT_LENGTH' => '4',
+          'HTTP_X_AMZ_ACL' => 'public-read',
+        }
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', @path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+        put @path, 'abcd', headers
+      end
+
+      it 'only AStringOfAccessKeyId is set to account' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account'].size.should == 1
+        acl['account']['AStringOfAccessKeyId'].should_not be_nil
+      end
+
+      it 'full_control is added to owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['AStringOfAccessKeyId'].should == [S3Adapter::Acl::FULL_CONTROL]
+      end
+
+      it 'authenticated is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['authenticated'].should be_nil
+      end
+
+      it 'read is added to guest' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['guest'].should == [S3Adapter::Acl::READ]
+      end
+    end
+
+    context 'public-read-write given x-amz-acl header' do
+      before(:all) do
+        headers = {
+          'HTTP_DATE'      => @time.httpdate,
+          'CONTENT_LENGTH' => '4',
+          'HTTP_X_AMZ_ACL' => 'public-read-write',
+        }
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', @path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+        put @path, 'abcd', headers
+      end
+
+      it 'only AStringOfAccessKeyId is set to account' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account'].size.should == 1
+        acl['account']['AStringOfAccessKeyId'].should_not be_nil
+      end
+
+      it 'full_control is added to owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['AStringOfAccessKeyId'].should == [S3Adapter::Acl::FULL_CONTROL]
+      end
+
+      it 'authenticated is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['authenticated'].should be_nil
+      end
+
+      it 'read and write are added to guest' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['guest'].should == [S3Adapter::Acl::READ, S3Adapter::Acl::WRITE]
+      end
+    end
+
+    context 'authenticated-read given x-amz-acl header' do
+      before(:all) do
+        headers = {
+          'HTTP_DATE'      => @time.httpdate,
+          'CONTENT_LENGTH' => '4',
+          'HTTP_X_AMZ_ACL' => 'authenticated-read',
+        }
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', @path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+        put @path, 'abcd', headers
+      end
+
+      it 'only AStringOfAccessKeyId is set to account' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account'].size.should == 1
+        acl['account']['AStringOfAccessKeyId'].should_not be_nil
+      end
+
+      it 'full_control is added to owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['AStringOfAccessKeyId'].should == [S3Adapter::Acl::FULL_CONTROL]
+      end
+
+      it 'read is added to authenticated' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['authenticated'].should == [S3Adapter::Acl::READ]
+      end
+
+      it 'guest is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['guest'].should be_nil
+      end
+    end
+
+    context 'bucket-owner-read given x-amz-acl header' do
+      before(:all) do
+        headers = {
+          'HTTP_DATE'      => @time.httpdate,
+          'CONTENT_LENGTH' => '4',
+          'HTTP_X_AMZ_ACL' => 'bucket-owner-read',
+        }
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', @path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+        put @path, 'abcd', headers
+      end
+
+      it 'only AStringOfAccessKeyId is set to account' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account'].size.should == 2
+        acl['account']['AStringOfAccessKeyId'].should_not be_nil
+        acl['account']['XXXXXXXXXXXXXXXXXXXX'].should_not be_nil
+      end
+
+      it 'full_control is added to owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['AStringOfAccessKeyId'].should == [S3Adapter::Acl::FULL_CONTROL]
+      end
+
+      it 'read is added to bucket owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['XXXXXXXXXXXXXXXXXXXX'].should == [S3Adapter::Acl::READ]
+      end
+
+      it 'authenticated is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['authenticated'].should be_nil
+      end
+
+      it 'guest is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['guest'].should be_nil
+      end
+    end
+
+    context 'bucket-owner-full-control given x-amz-acl header' do
+      before(:all) do
+        headers = {
+          'HTTP_DATE'      => @time.httpdate,
+          'CONTENT_LENGTH' => '4',
+          'HTTP_X_AMZ_ACL' => 'bucket-owner-full-control',
+        }
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', @path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+        put @path, 'abcd', headers
+      end
+
+      it 'only AStringOfAccessKeyId is set to account' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account'].size.should == 2
+        acl['account']['AStringOfAccessKeyId'].should_not be_nil
+        acl['account']['XXXXXXXXXXXXXXXXXXXX'].should_not be_nil
+      end
+
+      it 'full_control is added to owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['AStringOfAccessKeyId'].should == [S3Adapter::Acl::FULL_CONTROL]
+      end
+
+      it 'full_control is added to bucket owner.' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['account']['XXXXXXXXXXXXXXXXXXXX'].should == [S3Adapter::Acl::FULL_CONTROL]
+      end
+
+      it 'authenticated is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['authenticated'].should be_nil
+      end
+
+      it 'guest is set to nothing' do
+        acl = find_by_bucket_and_path('castoro', 'foo/bar/baz.txt') { |obj| obj.acl }
+        acl['guest'].should be_nil
+      end
+    end
+
+  end
+
   after(:all) do
     FileUtils.rm_r S3Adapter::Adapter::BASE if File.exists?(S3Adapter::Adapter::BASE)
   end

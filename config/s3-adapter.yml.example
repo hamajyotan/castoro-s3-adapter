@@ -13,9 +13,24 @@ test:
     castoro:
       basket_type: 999
       owner: XXXXXXXXXXXXXXXXXXXX
+      acl:
+        account:
+          XXXXXXXXXXXXXXXXXXXX:  [READ, WRITE, READ_ACP, WRITE_ACP]
+          AStringOfAccessKeyId:  [READ, WRITE, READ_ACP, WRITE_ACP]
+        authenticated:           [READ, WRITE, READ_ACP, WRITE_ACP]
+        guest:                   [READ, WRITE, READ_ACP, WRITE_ACP]
     test:
       basket_type: 1000
       owner: AStringOfAccessKeyId
+      acl:
+        account:
+          XXXXXXXXXXXXXXXXXXXX:  [FULL_CONTROL]
+          AStringOfAccessKeyId:  [FULL_CONTROL]
+        authenticated:           [FULL_CONTROL]
+        guest:                   [FULL_CONTROL]
+    no_set_acl:
+      basket_type: 1001
+      owner: NoSetACLAccessKeyId
   castoro-client: mock
 
 production:

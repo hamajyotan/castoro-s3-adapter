@@ -62,6 +62,7 @@ module S3Adapter::Middleware
     def signature_path env
       req = Rack::Request.new(env)
       params = [].tap { |p|
+        p << 'acl' if req.GET.include?('acl')
         [
           'response-cache-control',
           'response-content-disposition',
@@ -115,24 +116,6 @@ module S3Adapter::Middleware
         { 'Content-Type' => 'application/xml;charset=utf-8' },
         [ yield ],
       ]
-    end
-
-    def string_to_sign_bytes sign
-      sb = []
-
-      sign.join("\n").each_byte { |b|
-        if b.to_s(16).size == 1
-          sb << "0" + b.to_s(16)
-        else
-          sb << b.to_s(16)
-        end
-      }
-
-      string_to_sign_bytes= ""
-      sb.each { |i|
-        string_to_sign_bytes << i.to_s << " "
-      }
-      string_to_sign_bytes.chop
     end
 
     def invalid_date_header
@@ -201,6 +184,12 @@ module S3Adapter::Middleware
         xml.StringToSign @string_to_sign.join("\n")
         xml.AWSAccessKeyId access_key_id
       end
+    end
+
+    def string_to_sign_bytes sign
+      sign.join("\n").each_byte.map { |b|
+        "%02x" % b
+      }.join(' ')
     end
 
   end

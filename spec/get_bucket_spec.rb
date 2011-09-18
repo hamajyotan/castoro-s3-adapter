@@ -106,7 +106,7 @@ describe 'GET Bucket' do
     before(:each) do
       @user = 'test_user1'
       headers = {}
-      @signature = aws_signature("invalid_secret_access_key", 'GET', '/castoro', headers)
+      @signature = aws_signature("invalid_secret_access_key", 'GET', '/castoro/', headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
       get '/castoro/', {}, headers
     end

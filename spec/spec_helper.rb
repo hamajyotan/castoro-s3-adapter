@@ -135,6 +135,7 @@ module Rack
 end
 
 def signature_path path, query
+  path << "?acl" if query.include?("acl")
   params = [].tap { |p|
     [
       'response-cache-control',

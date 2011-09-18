@@ -5,7 +5,7 @@ options = $config.dup
 
 
 command_line { |opt|
-  opt.banner = "\nUsage:  #{File.basename($0)}  [options]"
+  opt.banner = "\nUsage:  #{File.basename($0)}  [options]  ACL_FILE"
 
   opt.on('-a [ADDRESS]', '--address', "s3-adapter address (default: #{options['address']})") { |v|
     options['address'] = v
@@ -22,6 +22,8 @@ command_line { |opt|
 
   begin
     opt.parse! ARGV
+    options['file'], = ARGV
+    raise if [options['file']].any? { |a| a.nil? }
   rescue
     puts opt.help
     exit 1
@@ -38,17 +40,19 @@ http_class = if options['proxy']
 
 http_class.start(options['address'], options['port']) { |http|
 
-  uri = "/#{options['bucket']}/?acl"
+  uri = "/#{options['bucket']}?acl"
   unless options['parameters'].empty?
-    uri << '&' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
+    uri << '?' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
   end
   headers = options['headers']
   if options['auth'] and not options['anonymous']
-    headers['Authorization'] = authorization_header 'GET', uri, headers, options['auth']
+    headers['Authorization'] = authorization_header 'PUT', uri, headers, options['auth']
   end
+  data = File.open(options['file'], 'r') { |f| f.read }
 
-  res = http.get(uri, headers)
+  res = http.put(uri, data, headers)
 
+  puts "\n[WARN]: s3-adapter has not supported PUT Bucket acl yet."
   puts res.code
   res.each { |k,v| puts "\t#{k}: #{v}" }
   $stdout.write res.body

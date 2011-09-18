@@ -18,6 +18,8 @@ module S3Adapter
     set :lock, true
     set :raise_errors, false
 
+    helpers Helper::AclHelper
+
     helpers do
       def get_object basket, key
         modified_since   = Time.httpdate(env["HTTP_IF_MODIFIED_SINCE"]) rescue nil
@@ -140,6 +142,33 @@ module S3Adapter
         cache_control       = env['HTTP_CACHE_CONTROL']
         content_encoding    = env['HTTP_CONTENT_ENCODING']
         content_disposition = env['HTTP_CONTENT_DISPOSITION']
+        x_amz_acl           = env['HTTP_X_AMZ_ACL'].to_s
+
+        owner = (env['s3adapter.authorization'] || {})['access_key_id']
+        acl = {}
+        acl['account'] = { owner => [Acl::FULL_CONTROL] } if owner
+        case x_amz_acl
+        when '', 'private'; # do noghing.
+        when 'public-read'
+          acl['guest'] = acl['guest'].to_a << Acl::READ
+        when 'public-read-write'
+          acl['guest'] = acl['guest'].to_a << Acl::READ << Acl::WRITE
+        when 'authenticated-read';
+          acl['authenticated'] = acl['authenticated'].to_a << Acl::READ
+        when 'bucket-owner-read';
+          if (bucket_owner = S3CONFIG['buckets'][@bucket]['owner']) and owner != bucket_owner
+            acl['account'][bucket_owner] = acl['account'][bucket_owner].to_a << Acl::READ
+          end
+        when 'bucket-owner-full-control';
+          if (bucket_owner = S3CONFIG['buckets'][@bucket]['owner']) and owner != bucket_owner
+            acl['account'][bucket_owner] = acl['account'][bucket_owner].to_a << Acl::FULL_CONTROL
+          end
+        else
+          @message        = ''
+          @argument_value = x_amz_acl
+          @argument_name  = 'x-amz-acl'
+          return builder(:invalid_argument)
+        end
 
         # set object value
         body = request.body.read content_length
@@ -167,6 +196,7 @@ module S3Adapter
           obj.content_encoding    = content_encoding if content_encoding
           obj.content_disposition = content_disposition if content_disposition
           obj.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
+          obj.acl                 = acl
           obj.deleted             = false
         else
           obj = S3Object.create { |o|
@@ -182,6 +212,7 @@ module S3Adapter
             o.content_encoding    = content_encoding if content_encoding
             o.content_disposition = content_disposition if content_disposition
             o.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
+            o.acl                 = acl
           }
         end
         obj.save
@@ -363,6 +394,141 @@ module S3Adapter
         return builder(:copy_object_result)
       end
 
+      def get_bucket_acl bucket
+        # check bucket name.
+        unless S3CONFIG["buckets"][bucket]
+          status 404
+          return builder(:no_such_bucket)
+        end
+
+        authenticator = Acl::Bucket.new bucket
+        unless authenticator.get_bucket_acl?((env['s3adapter.authorization'] || {})['access_key_id'])
+          @message = 'Access Denied'
+          status 403
+          return builder(:access_denied)
+        end
+
+        @grant = authenticator.to_list
+
+        # set owner_id and display_name.
+        @owner_id     = S3CONFIG['buckets'][bucket]['owner']
+        @display_name = User.find_by_access_key_id(@owner_id).display_name
+
+        status 200
+        return builder(:access_control_policy)
+      end
+
+      def get_object_acl bucket, key
+        # check bucket name.
+        unless (basket_type = (S3CONFIG["buckets"][bucket] || {})['basket_type'])
+          status 404
+          return builder(:no_such_bucket)
+        end
+
+        # get object from database.
+        unless (obj = S3Object.active.find_by_basket_type_and_path(basket_type, key))
+          status 404
+          return builder(:no_such_key)
+        end
+
+        unless obj.get_object_acl?((env['s3adapter.authorization'] || {})['access_key_id'])
+          @message = 'Access Denied'
+          status 403
+          return builder(:access_denied)
+        end
+
+        @grant = obj.to_list
+
+        # set owner_id and display_name.
+        @owner_id     = obj.owner_access_key
+        @display_name = User.find_by_access_key_id(@owner_id).display_name
+
+        status 200
+        return builder(:access_control_policy)
+      end
+
+      def get_bucket bucket
+        @bucket    = bucket
+        @prefix    = params[:prefix]
+        @marker    = params[:marker]
+        @delimiter = params[:delimiter]
+        @max_keys  = params["max-keys"] || 1000
+  
+        unless @max_keys.to_s =~ /^\-?[\d]+$/
+          @message = "Provided max-keys not an integer or within integer range"
+          @argument_value = @max_keys
+          @argument_name = "max-keys"
+          return builder(:invalid_argument)
+        end
+        @max_keys = @max_keys.to_i
+        unless (0..2147483647).include? @max_keys
+          @message = "Argument maxKeys must be an integer between 0 and 2147483647"
+          @argument_value = @max_keys
+          @argument_name = "maxKeys"
+          return builder(:invalid_argument)
+        end
+
+        # check bucket name.
+        unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
+          status 404
+          return builder(:no_such_bucket)
+        end
+  
+        cs = []
+        cs << "path like :prefix" unless @prefix.to_s.empty?
+        cs << "path > :marker" unless @marker.to_s.empty?
+        objects = S3Object.active.find(:all, :conditions => [cs.join(" and "), {:prefix => @prefix.to_s + '%', :marker => @marker.to_s}])
+        accounts = {}
+        @contents = objects.map { |o|
+          if accounts[o.owner_access_key].nil?
+            if u = User.find_by_access_key_id(o.owner_access_key)
+              accounts[o.owner_access_key] = {
+                :id => o.owner_access_key,
+                :display_name => u.display_name,
+              }
+            else
+              accounts[o.owner_access_key] = false
+            end
+          end
+          {
+            :key => o.path,
+            :last_modified => o.last_modified,
+            :etag => o.etag,
+            :size => o.size,
+            :owner => accounts[o.owner_access_key],
+            :storage_class => "STANDARD",
+          }
+        }
+  
+        @common_prefixes =
+          if @delimiter
+            @common_prefixes = @contents.map { |c|
+              $1 if c[:key] =~ /^(#{@prefix}.*?#{@delimiter}).*$/
+            }.uniq.compact.map { |p|
+              { :prefix => p }
+            }
+          end.to_a
+  
+        @contents.reject! { |c|
+          @common_prefixes.any? { |p|
+            c[:key] =~ /^#{p[:prefix]}.*$/
+          }
+        }
+  
+        if @truncated = (@contents.size + @common_prefixes.size) > @max_keys
+          @next_marker = (
+            @contents.map { |c| c[:key ] } + @common_prefixes.map { |p| p[:prefix] }
+          ).sort[@max_keys - 1]
+  
+          @contents.reject! { |c| @next_marker < c[:key] }
+          @common_prefixes.reject! { |p| @next_marker < p[:prefix] }
+        end
+  
+        @contents.sort! { |x, y| x[:key] <=> y[:key] }
+        @common_prefixes.sort! { |x, y| x[:prefix] <=> y[:prefix] }
+  
+        builder(:list_bucket_result)
+      end
     end
 
     # GET Service
@@ -387,86 +553,13 @@ module S3Adapter
 
     # GET Bucket
     get %r{^/([\w]+)/?$} do |bucket|
-      @bucket    = bucket
-      @prefix    = params[:prefix]
-      @marker    = params[:marker]
-      @delimiter = params[:delimiter]
-      @max_keys  = params["max-keys"] || 1000
+      @bucket = bucket
 
-      unless @max_keys.to_s =~ /^\-?[\d]+$/
-        @message = "Provided max-keys not an integer or within integer range"
-        @argument_value = @max_keys
-        @argument_name = "max-keys"
-        return builder(:invalid_argument)
+      if request.GET.key?('acl')
+        get_bucket_acl bucket
+      else
+        get_bucket bucket
       end
-      @max_keys = @max_keys.to_i
-      unless (0..2147483647).include? @max_keys
-        @message = "Argument maxKeys must be an integer between 0 and 2147483647"
-        @argument_value = @max_keys
-        @argument_name = "maxKeys"
-        return builder(:invalid_argument)
-      end
-
-      # check bucket name.
-      unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
-        status 404
-        return builder(:no_such_bucket)
-      end
-
-      cs = []
-      cs << "path like :prefix" unless @prefix.to_s.empty?
-      cs << "path > :marker" unless @marker.to_s.empty?
-      objects = S3Object.active.find(:all, :conditions => [cs.join(" and "), {:prefix => @prefix.to_s + '%', :marker => @marker.to_s}])
-      accounts = {}
-      @contents = objects.map { |o|
-        if accounts[o.owner_access_key].nil?
-          if u = User.find_by_access_key_id(o.owner_access_key)
-            accounts[o.owner_access_key] = {
-              :id => o.owner_access_key,
-              :display_name => u.display_name,
-            }
-          else
-            accounts[o.owner_access_key] = false
-          end
-        end
-        {
-          :key => o.path,
-          :last_modified => o.last_modified,
-          :etag => o.etag,
-          :size => o.size,
-          :owner => accounts[o.owner_access_key],
-          :storage_class => "STANDARD",
-        }
-      }
-
-      @common_prefixes =
-        if @delimiter
-          @common_prefixes = @contents.map { |c|
-            $1 if c[:key] =~ /^(#{@prefix}.*?#{@delimiter}).*$/
-          }.uniq.compact.map { |p|
-            { :prefix => p }
-          }
-        end.to_a
-
-      @contents.reject! { |c|
-        @common_prefixes.any? { |p|
-          c[:key] =~ /^#{p[:prefix]}.*$/
-        }
-      }
-
-      if @truncated = (@contents.size + @common_prefixes.size) > @max_keys
-        @next_marker = (
-          @contents.map { |c| c[:key ] } + @common_prefixes.map { |p| p[:prefix] }
-        ).sort[@max_keys - 1]
-
-        @contents.reject! { |c| @next_marker < c[:key] }
-        @common_prefixes.reject! { |p| @next_marker < p[:prefix] }
-      end
-
-      @contents.sort! { |x, y| x[:key] <=> y[:key] }
-      @common_prefixes.sort! { |x, y| x[:prefix] <=> y[:prefix] }
-
-      builder(:list_bucket_result)
     end
 
     # HEAD Object
@@ -478,7 +571,12 @@ module S3Adapter
     # GET Object
     get %r{^/(.*?)/(.+)$} do |bucket, key|
       @bucket, @key = bucket, key
-      get_object bucket, key
+
+      if request.GET.key?('acl')
+        get_object_acl bucket, key
+      else
+        get_object bucket, key
+      end
     end
 
     # DELETE Object

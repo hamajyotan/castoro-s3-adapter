@@ -1,6 +1,20 @@
 
 class S3Object < ActiveRecord::Base
 
+  include S3Adapter::Acl
+
+  def get_object? access_key_id
+    readable? access_key_id
+  end
+
+  def get_object_acl? access_key_id
+    acp_readable? access_key_id
+  end
+
+  def put_object_acl? access_key_id
+    acp_writable? access_key_id
+  end
+
   before_save :serialize_object
 
   def to_basket
@@ -17,6 +31,7 @@ class S3Object < ActiveRecord::Base
     :content_disposition,
     :cache_control,
     :owner_access_key,
+    :acl,
   ]
 
   accessors.each { |m|
@@ -40,6 +55,14 @@ class S3Object < ActiveRecord::Base
 
   named_scope :active, :conditions => { :deleted => false }
   named_scope :inactive, :conditions => { :deleted => true }
+
+  def get_acl
+    (self.acl || {})
+  end
+
+  def get_acl_owner
+    self.owner_access_key
+  end
 
 end
 
