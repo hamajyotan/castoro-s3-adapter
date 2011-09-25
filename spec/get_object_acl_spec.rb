@@ -435,8 +435,7 @@ describe 'GET Object acl' do
         end
   
         it 'should return response code 200' do
-#          last_response.should be_ok
-          last_response.status.should == 200
+          last_response.should be_ok
         end
   
         it 'should return response headers' do

@@ -55,6 +55,8 @@ describe 'HEAD Object' do
       o.size             = 4
       o.content_type     = "application/octet-stream"
       o.owner_access_key = "XXXXXXXXXXXXXXXXXXXX"
+      o.acl              = {'account' => {'XXXXXXXXXXXXXXXXXXXX' => [S3Adapter::Acl::READ]}}
+      o.meta             = {"title" => "the title"}
       o.save
     }
     S3Object.new { |o|
@@ -67,6 +69,7 @@ describe 'HEAD Object' do
       o.size             = 8
       o.content_type     = "text/plain"
       o.owner_access_key = "AStringOfAccessKeyId"
+      o.acl              = {'account' => {'XXXXXXXXXXXXXXXXXXXX' => [S3Adapter::Acl::READ]}}
       o.save
     }
     @time = Time.now
@@ -136,7 +139,7 @@ describe 'HEAD Object' do
     end
 
     it "should return response code 200." do
-      last_response.should be_ok
+      last_response.status.should == 200
     end
 
     it "should return response headers" do
@@ -144,6 +147,7 @@ describe 'HEAD Object' do
       last_response.header["etag"].should           == "ea703e7aa1efda0064eaa507d9e8ab7e"
       last_response.header["content-type"].should   == "application/octet-stream"
       last_response.header["accept-ranges"].should  == "bytes"
+      last_response.header['x-amz-meta-title'].should == 'the title'
     end
 
     it "should return no response body." do
@@ -162,7 +166,7 @@ describe 'HEAD Object' do
     end
 
     it "should return response code 200." do
-      last_response.should be_ok
+      last_response.status.should == 200
     end
 
     it "should return response headers" do
@@ -239,6 +243,7 @@ describe 'HEAD Object' do
 
       it "should return response code 206." do
         last_response.status.should == 206
+        last_response.header['x-amz-meta-title'].should == 'the title'
       end
 
       it "should return response headers" do
@@ -269,6 +274,10 @@ describe 'HEAD Object' do
 
       it "should return response code 200." do
         last_response.should be_ok
+      end
+
+      it "should return response headers" do
+        last_response.header['x-amz-meta-title'].should == 'the title'
       end
 
       it "should return no response body." do
@@ -317,6 +326,7 @@ describe 'HEAD Object' do
 
       it "should return content-range response header." do
         last_response.header["content-range"].should == "bytes 3-3/4"
+        last_response.header['x-amz-meta-title'].should == 'the title'
       end
 
       it "should return no response body." do
@@ -341,6 +351,10 @@ describe 'HEAD Object' do
         last_response.should be_ok
       end
 
+      it "should return response headers" do
+        last_response.header['x-amz-meta-title'].should == 'the title'
+      end
+
       it "should return no response body." do
         last_response.body.should be_empty
       end
@@ -363,6 +377,10 @@ describe 'HEAD Object' do
         last_response.status.should == 304
       end
 
+      it "should return nothing metadata header" do
+        last_response.header['x-amz-meta-title'].should == nil
+      end
+
       it "should return no response body." do
         last_response.body.should be_empty
       end
@@ -383,6 +401,10 @@ describe 'HEAD Object' do
 
       it "should return response code 304." do
         last_response.status.should == 304
+      end
+
+      it "should return nothing metadata header" do
+        last_response.header['x-amz-meta-title'].should == nil
       end
 
       it "should return no response body." do
@@ -429,6 +451,10 @@ describe 'HEAD Object' do
         last_response.should be_ok
       end
 
+      it "should return response headers" do
+        last_response.header['x-amz-meta-title'].should == 'the title'
+      end
+
       it "should return no response body." do
         last_response.body.should be_empty
       end
@@ -451,6 +477,10 @@ describe 'HEAD Object' do
         last_response.should be_ok
       end
 
+      it "should return response headers" do
+        last_response.header['x-amz-meta-title'].should == 'the title'
+      end
+
       it "should return no response body." do
         last_response.body.should be_empty
       end
@@ -471,6 +501,10 @@ describe 'HEAD Object' do
 
       it "should return response code 200." do
         last_response.should be_ok
+      end
+
+      it "should return resopnse headers" do
+        last_response.header['x-amz-meta-title'].should == 'the title'
       end
 
       it "should return no response body." do
@@ -517,6 +551,10 @@ describe 'HEAD Object' do
         last_response.should be_ok
       end
 
+      it "should return response headers" do
+        last_response.header['x-amz-meta-title'].should == 'the title'
+      end
+
       it "should return no response body." do
         last_response.body.should be_empty
       end
@@ -537,6 +575,10 @@ describe 'HEAD Object' do
 
       it "should return response code 304." do
         last_response.status.should == 304
+      end
+
+      it "should return nothing metadata header" do
+        last_response.header['x-amz-meta-title'].should == nil
       end
 
       it "should return no response body." do
@@ -567,6 +609,7 @@ describe 'HEAD Object' do
 
       it "should return content-range response header." do
         last_response.header["content-range"].should == "bytes 0-2/4"
+        last_response.header['x-amz-meta-title'].should == 'the title'
       end
 
       it "should return no response body." do
@@ -618,6 +661,10 @@ describe 'HEAD Object' do
         last_response.should be_ok
       end
 
+      it "should return response headers" do
+        last_response.header['x-amz-meta-title'].should == 'the title'
+      end
+
       it "should return no response body." do
         last_response.body.should be_empty
       end
@@ -639,6 +686,10 @@ describe 'HEAD Object' do
 
       it "should return response code 200." do
         last_response.should be_ok
+      end
+
+      it "should return response headers" do
+        last_response.header['x-amz-meta-title'].should == 'the title'
       end
 
       it "should return no response body." do

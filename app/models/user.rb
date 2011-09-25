@@ -1,5 +1,8 @@
 
 class User < ActiveRecord::Base
+
+  ANONYMOUS_ID = '65a011a29cdf8ec533ec3d1ccaae921c'.freeze
+
   validates_presence_of   :access_key_id
   validates_length_of     :access_key_id, :maximum => 20, :allow_nil => true
   validates_format_of     :access_key_id, :with => /^[0-9A-Za-z]*$/

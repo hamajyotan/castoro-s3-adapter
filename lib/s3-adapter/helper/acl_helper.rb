@@ -13,7 +13,7 @@ module S3Adapter
             when :user
               xml.Grantee 'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance', 'xsi:type' => 'CanonicalUser' do
                 xml.ID g[:id]
-                xml.DisplayName g[:display_name]
+                xml.DisplayName g[:display_name] if g[:display_name]
               end
             end
             xml.Permission g[:permission]

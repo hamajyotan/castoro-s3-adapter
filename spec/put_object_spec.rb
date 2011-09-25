@@ -109,8 +109,9 @@ describe 'PUT Object' do
       @user = 'test_user1'
       path = '/castoro/hoge/fuga/piyo.txt'
       headers = {
-        "HTTP_DATE"      => @time.httpdate,
-        "CONTENT_LENGTH" => "4"
+        "HTTP_DATE"           => @time.httpdate,
+        "CONTENT_LENGTH"      => "4",
+        "HTTP_X_AMZ_META_FOO" => "foofoo",
       }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
@@ -141,6 +142,7 @@ describe 'PUT Object' do
         obj.size.should             == 4
         obj.content_type.should     == "binary/octet-stream"
         obj.owner_access_key.should == "XXXXXXXXXXXXXXXXXXXX"
+        obj.meta.should             == {'foo' => 'foofoo'}
       }
     end
 
@@ -158,8 +160,9 @@ describe 'PUT Object' do
       @user = 'test_user1'
       path = "/castoro/foo/bar/baz.txt"
       headers = {
-        "HTTP_DATE"      => @time.httpdate,
-        "CONTENT_LENGTH" => "4"
+        "HTTP_DATE"           => @time.httpdate,
+        "CONTENT_LENGTH"      => "4",
+        "HTTP_X_AMZ_META_FOO" => "FOO!!",
       }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
@@ -167,8 +170,9 @@ describe 'PUT Object' do
       # override PUT Object
       @user = 'test_user2'
       headers = {
-        "HTTP_DATE"      => @time.httpdate,
-        "CONTENT_LENGTH" => "8"
+        "HTTP_DATE"           => @time.httpdate,
+        "CONTENT_LENGTH"      => "8",
+        "HTTP_X_AMZ_META_FOO" => "foofoo",
       }
       signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
@@ -199,6 +203,7 @@ describe 'PUT Object' do
         obj.size.should             == 8
         obj.content_type.should     == "binary/octet-stream"
         obj.owner_access_key.should == "AStringOfAccessKeyId"
+        obj.meta.should             == {"foo" => "foofoo"}
       }
     end
 
@@ -231,6 +236,7 @@ describe 'PUT Object' do
       find_by_bucket_and_path('castoro', 'zerobyte/file.txt') { |obj|
         obj.should_not be_nil
         obj.size.should == 0
+        obj.meta.should == {}
       }
     end
 
@@ -751,6 +757,39 @@ describe 'PUT Object' do
       end
     end
 
+  end
+
+  describe 'access which is not permitted' do
+    context 'given not permitted bucket' do
+      before(:all) do
+        @user = 'test_user1'
+        @path = '/no_set_acl/foo/bar/baz.txt'
+        headers = {
+          'HTTP_DATE'      => @time.httpdate,
+          'CONTENT_LENGTH' => '4',
+        }
+        signature = aws_signature(@users[@user]['secret-access-key'], 'PUT', @path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{signature}"
+        put @path, 'abcd', headers
+      end
+
+      it 'should return response code 403' do
+        last_response.status.should == 403
+      end
+
+      it 'should return response headers' do
+        last_response.header['server'].should == 'AmazonS3'
+        last_response.header['content-type'].should == 'application/xml;charset=utf-8'
+      end
+
+      it 'should return access denied response' do
+        xml = REXML::Document.new last_response.body
+        xml.elements['Error/Code'].text.should    == 'AccessDenied'
+        xml.elements['Error/Message'].text.should == 'Access Denied'
+        xml.elements['Error/RequestId'].text.should == nil
+        xml.elements['Error/HostId'].text.should == nil
+      end
+    end
   end
 
   after(:all) do

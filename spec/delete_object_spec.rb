@@ -245,6 +245,38 @@ describe 'DELETE Object' do
     end
   end
 
+  describe 'access which is not permitted' do
+    context 'given not permitted bucket' do
+      before(:all) do
+        @user = 'test_user1'
+        path = '/no_set_acl/foo/bar/baz.txt'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'DELETE', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        delete path, {}, headers
+      end
+
+      it "should return response code 403." do
+        last_response.status.should == 403
+      end
+
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+      end
+
+      it 'should return all object-list.' do
+        xml = REXML::Document.new last_response.body
+        xml.elements['Error/Code'].text.should    == 'AccessDenied'
+        xml.elements['Error/Message'].text.should == 'Access Denied'
+        xml.elements['Error/RequestId'].text.should == nil
+        xml.elements['Error/HostId'].text.should == nil
+      end
+    end
+  end
+
   after(:all) do
     FileUtils.rm_r S3Adapter::Adapter::BASE if File.exists?(S3Adapter::Adapter::BASE)
   end

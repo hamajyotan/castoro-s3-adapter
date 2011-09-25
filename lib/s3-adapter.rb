@@ -4,6 +4,11 @@ module S3Adapter
   autoload :Adapter, 's3-adapter/adapter'
   autoload :Authenticator, 's3-adapter/authenticator'
   autoload :DependencyInjector, 's3-adapter/dependency_injector'
+  autoload :FileStream, 's3-adapter/file_stream'
+
+  module Helper
+    autoload :AclHelper         , 's3-adapter/helper/acl_helper'
+  end
 
   module Helper
     autoload :AclHelper         , 's3-adapter/helper/acl_helper'

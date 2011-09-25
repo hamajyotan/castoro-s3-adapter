@@ -101,6 +101,13 @@ module S3Adapter
           }
         end
 
+        # permission.
+        unless obj.get_object? request_owner
+          @message = "Access Denied"
+          status 403
+          return builder(:access_denied)
+        end
+
         # check if_none_match and if_modified_since
         if env["HTTP_IF_NONE_MATCH"] and modified_since
           return 304, hs, nil if obj.etag == env["HTTP_IF_NONE_MATCH"].gsub("\"", "") and last_modified <= modified_since
@@ -110,12 +117,116 @@ module S3Adapter
           return 304, hs, nil
         end
 
-        if first or last
-          hs["content-range"] = last < obj.size-1 ? "bytes #{first}-#{last}/#{obj.size}" : "bytes #{first}-#{obj.size-1}/#{obj.size}"
-          return 206, hs, File.open(file, "rb") { |f| f.pos = first; f.read(last-first+1) }
-        else
-          return 200, hs, File.open(file, "rb") { |f| f.read }
+        # metadata
+        (obj.meta || {}).each { |k,v| hs["x-amz-meta-#{k.downcase}"] = v }
+
+        # response
+        fs = FileStream.new file, :pos => first, :bytes => last
+        [fs.status, hs.merge(fs.headers), fs]
+      end
+
+      def put_object_acl bucket, key
+
+        request.body.rewind
+        body        = request.body.read
+        x_amz_acl   = env['HTTP_X_AMZ_ACL'].to_s
+        content_md5 = env['HTTP_CONTENT_MD5']
+        owner       = (env['s3adapter.authorization'] || {})['access_key_id']
+
+        if !body.empty? and !x_amz_acl.empty?
+          status 400
+          return builder(:unexpected_content)
         end
+
+        acl = {}
+        if body.empty? and !x_amz_acl.empty?
+          acl['account'] = { owner => [Acl::FULL_CONTROL] } if owner
+          case x_amz_acl
+          when 'private'; # do noghing.
+          when 'public-read'
+            acl['guest'] = acl['guest'].to_a << Acl::READ
+          when 'public-read-write'
+            acl['guest'] = acl['guest'].to_a << Acl::READ << Acl::WRITE
+          when 'authenticated-read';
+            acl['authenticated'] = acl['authenticated'].to_a << Acl::READ
+          when 'bucket-owner-read';
+            if (bucket_owner = S3CONFIG['buckets'][@bucket]['owner']) and owner != bucket_owner
+              acl['account'][bucket_owner] = acl['account'][bucket_owner].to_a << Acl::READ
+            end
+          when 'bucket-owner-full-control';
+            if (bucket_owner = S3CONFIG['buckets'][@bucket]['owner']) and owner != bucket_owner
+              acl['account'][bucket_owner] = acl['account'][bucket_owner].to_a << Acl::FULL_CONTROL
+            end
+          else
+            @message        = ''
+            @argument_value = x_amz_acl
+            @argument_name  = 'x-amz-acl'
+            return builder(:invalid_argument)
+          end
+
+        elsif !body.empty? and x_amz_acl.empty?
+          # validate content-MD5
+          @expected_digest   = content_md5
+          @calculated_digest = Base64.encode64(Digest::MD5.digest(body)).chomp
+          if content_md5 and @expected_digest != @calculated_digest
+            status 400
+            return builder(:bad_digest)
+          end
+
+          # invalid content length error.
+          content_length = Integer(env['CONTENT_LENGTH']) rescue (return 400, nil)
+
+          # content length size 0.
+          if content_length == 0
+            status 400
+            @missing_header_name = 'x-amz-acl'
+            return builder(:missing_security_header)
+          end
+
+          # content length less than content size.
+          if content_length < body.size
+            status 400
+            return builder(:malformed_acl_error)
+          end
+
+          # parse xml
+          begin
+            acl = S3Adapter::Acl::Parser.new(body).acl
+          rescue S3Adapter::Acl::ParserError
+            status 400
+            return builder(:malformed_acl_error)
+          end
+
+        else
+          status 400
+          @missing_header_name = 'x-amz-acl'
+          return builder(:missing_security_header)
+        end
+
+        # check bucket name.
+        unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
+          status 404
+          return builder(:no_such_bucket)
+        end
+
+        # get basket from database.
+        unless (obj = S3Object.active.find_by_basket_type_and_path(basket_type, key))
+          status 404
+          return builder(:no_such_key)
+        end
+
+        # permission.
+        unless obj.put_object_acl?(request_owner)
+          @message = 'Access Denied'
+          status 403
+          return builder(:access_denied)
+        end
+
+        # save acl.
+        obj.acl = acl
+        obj.save
+
+        [200, {}, []]
       end
 
       def put_object bucket, key
@@ -123,6 +234,13 @@ module S3Adapter
         unless (basket_type = (S3CONFIG["buckets"][@bucket] || {})["basket_type"])
           status 404
           return builder(:no_such_bucket)
+        end
+
+        authenticator = Acl::Bucket.new @bucket
+        unless authenticator.put_object?(request_owner)
+          @message = 'Access Denied'
+          status 403
+          return builder(:access_denied)
         end
 
         # validate content_length.
@@ -143,10 +261,11 @@ module S3Adapter
         content_encoding    = env['HTTP_CONTENT_ENCODING']
         content_disposition = env['HTTP_CONTENT_DISPOSITION']
         x_amz_acl           = env['HTTP_X_AMZ_ACL'].to_s
+        meta                = Hash[env.map { |k,v| [$1.downcase,v] if k =~ /^HTTP_X_AMZ_META_(.+)$/ } ]
 
-        owner = (env['s3adapter.authorization'] || {})['access_key_id']
+        owner = request_owner || User::ANONYMOUS_ID
         acl = {}
-        acl['account'] = { owner => [Acl::FULL_CONTROL] } if owner
+        acl['account'] = { owner => [Acl::FULL_CONTROL] }
         case x_amz_acl
         when '', 'private'; # do noghing.
         when 'public-read'
@@ -177,6 +296,7 @@ module S3Adapter
 
         # validate content-MD5
         if @content_md5 and Base64.decode64(@content_md5).chomp != Digest::MD5.digest(body)
+          @content_md5 = @content_md5.chomp
           status 400
           return builder(:invalid_digest)
         end
@@ -197,6 +317,7 @@ module S3Adapter
           obj.content_disposition = content_disposition if content_disposition
           obj.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
           obj.acl                 = acl
+          obj.meta                = meta
           obj.deleted             = false
         else
           obj = S3Object.create { |o|
@@ -213,6 +334,7 @@ module S3Adapter
             o.content_disposition = content_disposition if content_disposition
             o.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
             o.acl                 = acl
+            o.meta                = meta
           }
         end
         obj.save
@@ -237,8 +359,15 @@ module S3Adapter
         end
 
         # check authorization.
-        unless env["s3adapter.authorization"]
+        unless request_owner
           @message = "Anonymous users cannot copy objects.  Please authenticate."
+          status 403
+          return builder(:access_denied)
+        end
+
+        # permission
+        unless Acl::Bucket.new(bucket).get_bucket_acl?(request_owner)
+          @message = 'Access Denied'
           status 403
           return builder(:access_denied)
         end
@@ -251,6 +380,8 @@ module S3Adapter
         cache_control       = env['HTTP_CACHE_CONTROL']
         content_encoding    = env['HTTP_CONTENT_ENCODING']
         content_disposition = env['HTTP_CONTENT_DISPOSITION']
+        x_amz_acl           = env['HTTP_X_AMZ_ACL'].to_s
+        meta                = {}
 
         # validate content_length.
         if (content_length and (content_length.to_i > 0))
@@ -351,6 +482,33 @@ module S3Adapter
           cache_control = source_obj.cache_control || nil
           content_encoding = source_obj.content_encoding || nil
           content_disposition = source_obj.content_disposition || nil
+          meta = source_obj.meta || {}
+        end
+
+        owner = (env['s3adapter.authorization'] || {})['access_key_id']
+        acl = {}
+        acl['account'] = { owner => [Acl::FULL_CONTROL] } if owner
+        case x_amz_acl
+        when '', 'private'; # do noghing.
+        when 'public-read'
+          acl['guest'] = acl['guest'].to_a << Acl::READ
+        when 'public-read-write'
+          acl['guest'] = acl['guest'].to_a << Acl::READ << Acl::WRITE
+        when 'authenticated-read';
+          acl['authenticated'] = acl['authenticated'].to_a << Acl::READ
+        when 'bucket-owner-read';
+          if (bucket_owner = S3CONFIG['buckets'][@bucket]['owner']) and owner != bucket_owner
+            acl['account'][bucket_owner] = acl['account'][bucket_owner].to_a << Acl::READ
+          end
+        when 'bucket-owner-full-control';
+          if (bucket_owner = S3CONFIG['buckets'][@bucket]['owner']) and owner != bucket_owner
+            acl['account'][bucket_owner] = acl['account'][bucket_owner].to_a << Acl::FULL_CONTROL
+          end
+        else
+          @message        = ''
+          @argument_value = x_amz_acl
+          @argument_name  = 'x-amz-acl'
+          return builder(:invalid_argument)
         end
 
         # get and create basket from database.
@@ -364,7 +522,9 @@ module S3Adapter
           obj.cache_control       = cache_control if cache_control
           obj.content_encoding    = content_encoding if content_encoding
           obj.content_disposition = content_disposition if content_disposition
-          obj.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
+          obj.owner_access_key    = request_owner
+          obj.acl                 = acl
+          obj.meta                = meta
           obj.deleted             = false
         else
           obj = S3Object.create { |o|
@@ -379,7 +539,9 @@ module S3Adapter
             o.cache_control       = cache_control if cache_control
             o.content_encoding    = content_encoding if content_encoding
             o.content_disposition = content_disposition if content_disposition
-            o.owner_access_key    = (env['s3adapter.authorization'] || {})['access_key_id']
+            o.owner_access_key    = request_owner
+            o.acl                 = acl
+            o.meta                = meta
           }
         end
         obj.save
@@ -401,8 +563,9 @@ module S3Adapter
           return builder(:no_such_bucket)
         end
 
+        # permission
         authenticator = Acl::Bucket.new bucket
-        unless authenticator.get_bucket_acl?((env['s3adapter.authorization'] || {})['access_key_id'])
+        unless authenticator.get_bucket_acl?(request_owner)
           @message = 'Access Denied'
           status 403
           return builder(:access_denied)
@@ -440,8 +603,8 @@ module S3Adapter
         @grant = obj.to_list
 
         # set owner_id and display_name.
-        @owner_id     = obj.owner_access_key
-        @display_name = User.find_by_access_key_id(@owner_id).display_name
+        @owner_id     = obj.owner_access_key || User::ANONYMOUS_ID
+        @display_name = obj.owner_access_key ? User.find_by_access_key_id(@owner_id).display_name : nil
 
         status 200
         return builder(:access_control_policy)
@@ -473,12 +636,21 @@ module S3Adapter
           status 404
           return builder(:no_such_bucket)
         end
-  
+
+        # permission.
+        unless Acl::Bucket.new(@bucket).get_bucket? request_owner
+          @message = "Access Denied"
+          status 403
+          return builder(:access_denied)
+        end
+        
         cs = []
+        cs << "basket_type = :basket_type"
         cs << "path like :prefix" unless @prefix.to_s.empty?
         cs << "path > :marker" unless @marker.to_s.empty?
-        objects = S3Object.active.find(:all, :conditions => [cs.join(" and "), {:prefix => @prefix.to_s + '%', :marker => @marker.to_s}])
-        accounts = {}
+        values = {:basket_type => basket_type, :prefix => @prefix.to_s + '%', :marker => @marker.to_s}
+        objects = S3Object.active.find(:all, :conditions => [cs.join(" and "), values])
+        accounts = {nil => {:id => User::ANONYMOUS_ID, :display_name => nil}}
         @contents = objects.map { |o|
           if accounts[o.owner_access_key].nil?
             if u = User.find_by_access_key_id(o.owner_access_key)
@@ -495,7 +667,7 @@ module S3Adapter
             :last_modified => o.last_modified,
             :etag => o.etag,
             :size => o.size,
-            :owner => accounts[o.owner_access_key],
+            :owner => o.get_owner?(request_owner) ? accounts[o.owner_access_key] : nil,
             :storage_class => "STANDARD",
           }
         }
@@ -589,6 +761,13 @@ module S3Adapter
         return builder(:no_such_bucket)
       end
 
+      # permission.
+      unless Acl::Bucket.new(@bucket).delete_object? request_owner
+        @message = "Access Denied"
+        status 403
+        return builder(:access_denied)
+      end
+      
       # get basket from database.
       unless (obj = S3Object.active.find_by_basket_type_and_path(basket_type, key))
         status 204
@@ -616,11 +795,19 @@ module S3Adapter
     put %r{^/(.*?)/(.+)$} do |bucket, key|
       @bucket, @key = bucket, key
 
-      if env.key?("HTTP_X_AMZ_COPY_SOURCE")
-        return copy_object bucket, key
+      if request.GET.key?('acl')
+        put_object_acl bucket, key
+      elsif env.key?("HTTP_X_AMZ_COPY_SOURCE")
+        copy_object bucket, key
       else
-        return put_object bucket, key
+        put_object bucket, key
       end
+    end
+
+    private
+
+    def request_owner
+      (env['s3adapter.authorization'] || {})['access_key_id']
     end
 
   end

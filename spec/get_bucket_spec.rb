@@ -65,6 +65,18 @@ describe 'GET Bucket' do
       o.content_type = "image/gif"
       o.save
     }
+    S3Object.new { |o|
+      o.basket_type = 1000
+      o.path = "hoge/fuga.jpg"
+      o.id = 4
+      o.basket_rev = 1
+      o.last_modified = "2011-07-22T21:23:41+09:00"
+      o.etag = "73feffa4b7f6bb68e44cf984c85f6e88"
+      o.size = 3
+      o.content_type = "image/jpeg"
+      o.owner_access_key = nil # nobody
+      o.save
+    }
   end
 
   before(:each) do # mock cannot be used by before(:all).
@@ -105,10 +117,11 @@ describe 'GET Bucket' do
   context 'given invalid secret_access_key of authorization header' do
     before(:each) do
       @user = 'test_user1'
+      path = '/castoro/'
       headers = {}
-      @signature = aws_signature("invalid_secret_access_key", 'GET', '/castoro/', headers)
+      @signature = aws_signature("invalid_secret_access_key", 'GET', path, headers)
       headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
-      get '/castoro/', {}, headers
+      get path, {}, headers
     end
 
     it 'should return code 403' do
@@ -135,11 +148,18 @@ describe 'GET Bucket' do
 
   context 'given valid bucketname' do
     before(:all) do
-      get '/castoro/'
+      @user = 'test_user1'
+      path = '/castoro/'
+      headers = {
+        'HTTP_DATE' => Time.now.httpdate,
+      }
+      @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+      headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+      get path, {}, headers
     end
 
     it "should return response code 200." do
-      last_response.should be_ok
+      last_response.status.should == 200
     end
 
     it "should return response headers" do
@@ -169,8 +189,7 @@ describe 'GET Bucket' do
       xml.elements["ListBucketResult/Contents[3]/Key"].text.should == "hoge/piyo.gif"
       xml.elements["ListBucketResult/Contents[3]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
       xml.elements["ListBucketResult/Contents[3]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
-      xml.elements["ListBucketResult/Contents[3]/Owner/ID"].text.should == "AStringOfAccessKeyId"
-      xml.elements["ListBucketResult/Contents[3]/Owner/DisplayName"].text.should == "test_user2"
+      xml.elements["ListBucketResult/Contents[3]/Owner"].should == nil
       xml.elements["ListBucketResult/Contents[3]/Size"].text.should == "8"
       xml.elements["ListBucketResult/Contents[3]/StorageClass"].text.should == "STANDARD"
       xml.elements["ListBucketResult/Contents[4]"].should be_nil
@@ -203,11 +222,18 @@ describe 'GET Bucket' do
   describe 'request parameters' do
     context 'given delimiter' do
       before(:all) do
-        get '/castoro/?delimiter=hoge/'
+        @user = 'test_user1'
+        path = '/castoro/?delimiter=hoge/'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        get path, {}, headers
       end
 
       it "should return response code 200." do
-        last_response.should be_ok
+        last_response.status.should == 200
       end
 
       it "should return response headers" do
@@ -237,7 +263,14 @@ describe 'GET Bucket' do
 
     context 'given prefix' do
       before(:all) do
-        get '/castoro/?prefix=hoge/'
+        @user = 'test_user1'
+        path = '/castoro/?prefix=hoge/'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        get path, {}, headers
       end
 
       it "should return response code 200." do
@@ -265,8 +298,7 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[2]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
         xml.elements["ListBucketResult/Contents[2]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
         xml.elements["ListBucketResult/Contents[2]/Size"].text.should == "8"
-        xml.elements["ListBucketResult/Contents[2]/Owner/ID"].text.should == "AStringOfAccessKeyId"
-        xml.elements["ListBucketResult/Contents[2]/Owner/DisplayName"].text.should == "test_user2"
+        xml.elements["ListBucketResult/Contents[2]/Owner"].should == nil
         xml.elements["ListBucketResult/Contents[2]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[3]"].should be_nil
       end
@@ -274,7 +306,14 @@ describe 'GET Bucket' do
 
     context 'given marker' do
       before(:all) do
-        get '/castoro/?marker=hoge/fuga.jpg'
+        @user = 'test_user1'
+        path = '/castoro/?marker=hoge/fuga.jpg'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        get path, {}, headers
       end
 
       it "should return response code 200." do
@@ -296,8 +335,7 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[1]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
         xml.elements["ListBucketResult/Contents[1]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
         xml.elements["ListBucketResult/Contents[1]/Size"].text.should == "8"
-        xml.elements["ListBucketResult/Contents[1]/Owner/ID"].text.should == "AStringOfAccessKeyId"
-        xml.elements["ListBucketResult/Contents[1]/Owner/DisplayName"].text.should == "test_user2"
+        xml.elements["ListBucketResult/Contents[1]/Owner"].should == nil
         xml.elements["ListBucketResult/Contents[1]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[2]"].should be_nil
       end
@@ -305,7 +343,14 @@ describe 'GET Bucket' do
 
     context 'given max-keys' do
       before(:all) do
-        get '/castoro/?max-keys=2'
+        @user = 'test_user1'
+        path = '/castoro/?max-keys=2'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        get path, {}, headers
       end
 
       it "should return response code 200." do
@@ -343,7 +388,14 @@ describe 'GET Bucket' do
 
     context 'given prefix and delimiter' do
       before(:all) do
-        get '/castoro/?prefix=hoge&delimiter=i'
+        @user = 'test_user1'
+        path = '/castoro/?prefix=hoge&delimiter=i'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        get path, {}, headers
       end
 
       it "should return response code 200." do
@@ -376,7 +428,14 @@ describe 'GET Bucket' do
 
     context 'given delimiter and max-keys' do
       before(:all) do
-        get '/castoro/?delimiter=foo/&max-keys=2'
+        @user = 'test_user1'
+        path = '/castoro/?delimiter=foo/&max-keys=2'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        get path, {}, headers
       end
 
       it "should return response code 200." do
@@ -409,7 +468,14 @@ describe 'GET Bucket' do
 
       context 'specified delimiter and max-keys return one CommonPrefix' do
         before(:all) do
-          get '/castoro/?delimiter=foo/&max-keys=1'
+          @user = 'test_user1'
+          path = '/castoro/?delimiter=foo/&max-keys=1'
+          headers = {
+            'HTTP_DATE' => Time.now.httpdate,
+          }
+          @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+          headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+          get path, {}, headers
         end
 
         it "should return response code 200." do
@@ -437,7 +503,14 @@ describe 'GET Bucket' do
 
       context 'specified delimiter and max-keys return one Content' do
         before(:all) do
-          get '/castoro/?delimiter=hoge/&max-keys=1'
+          @user = 'test_user1'
+          path = '/castoro/?delimiter=hoge/&max-keys=1'
+          headers = {
+            'HTTP_DATE' => Time.now.httpdate,
+          }
+          @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+          headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+          get path, {}, headers
         end
 
         it "should return response code 200." do
@@ -476,11 +549,19 @@ describe 'GET Bucket' do
   describe 'subdomain access' do
     context 'given castoro.s3.adapter' do
       before(:all) do
-        get '/', {}, 'HTTP_HOST' => 'castoro.s3.adapter'
+        @user = 'test_user1'
+        path = '/'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+          'HTTP_HOST' => 'castoro.s3.adapter',
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', '/castoro/', headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        get path, {}, headers
       end
 
       it "should return response code 200." do
-        last_response.should be_ok
+        last_response.status.should == 200
       end
 
       it "should return response headers" do
@@ -488,7 +569,6 @@ describe 'GET Bucket' do
       end
 
       it 'should return all object-list.' do
-
         xml = REXML::Document.new last_response.body
 
         xml.elements["ListBucketResult/Name"].text.should == "castoro"
@@ -513,10 +593,41 @@ describe 'GET Bucket' do
         xml.elements["ListBucketResult/Contents[3]/LastModified"].text.should == "2011-07-22T22:22:59+09:00"
         xml.elements["ListBucketResult/Contents[3]/ETag"].text.should == "8059cabc22e766aea3c60ce67a82075e"
         xml.elements["ListBucketResult/Contents[3]/Size"].text.should == "8"
-        xml.elements["ListBucketResult/Contents[3]/Owner/ID"].text.should == "AStringOfAccessKeyId"
-        xml.elements["ListBucketResult/Contents[3]/Owner/DisplayName"].text.should == "test_user2"
+        xml.elements["ListBucketResult/Contents[3]/Owner"].should == nil
         xml.elements["ListBucketResult/Contents[3]/StorageClass"].text.should == "STANDARD"
         xml.elements["ListBucketResult/Contents[4]"].should be_nil
+      end
+    end
+  end
+
+  describe 'access which is not permitted' do
+    context 'given not permitted bucket' do
+      before(:all) do
+        @user = 'test_user1'
+        path = '/no_set_acl/'
+        headers = {
+          'HTTP_DATE' => Time.now.httpdate,
+        }
+        @signature = aws_signature(@users[@user]['secret-access-key'], 'GET', path, headers)
+        headers['HTTP_AUTHORIZATION'] = "AWS #{@users[@user]['access-key-id']}:#{@signature}"
+        get path, {}, headers
+      end
+
+      it "should return response code 403." do
+        last_response.status.should == 403
+      end
+
+      it "should return response headers" do
+        last_response.header["server"].should == "AmazonS3"
+        last_response.header["content-type"].should == "application/xml;charset=utf-8"
+      end
+
+      it 'should return access denied response' do
+        xml = REXML::Document.new last_response.body
+        xml.elements['Error/Code'].text.should    == 'AccessDenied'
+        xml.elements['Error/Message'].text.should == 'Access Denied'
+        xml.elements['Error/RequestId'].text.should == nil
+        xml.elements['Error/HostId'].text.should == nil
       end
     end
   end

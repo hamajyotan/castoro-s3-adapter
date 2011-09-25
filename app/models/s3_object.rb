@@ -15,6 +15,10 @@ class S3Object < ActiveRecord::Base
     acp_writable? access_key_id
   end
 
+  def get_owner? access_key_id
+    acp_readable? access_key_id
+  end
+
   before_save :serialize_object
 
   def to_basket
@@ -32,6 +36,7 @@ class S3Object < ActiveRecord::Base
     :cache_control,
     :owner_access_key,
     :acl,
+    :meta,
   ]
 
   accessors.each { |m|

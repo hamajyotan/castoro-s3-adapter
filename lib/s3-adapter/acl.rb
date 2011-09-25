@@ -3,6 +3,8 @@ module S3Adapter
   module Acl
 
     autoload :Bucket, 's3-adapter/acl/bucket'
+    autoload :Parser, 's3-adapter/acl/parser'
+    autoload :ParserError, 's3-adapter/acl/parser'
 
     READ         = 'READ'.freeze
     WRITE        = 'WRITE'.freeze
@@ -13,10 +15,16 @@ module S3Adapter
     def to_list
       [].tap { |l|
         (get_acl['account'] || {}).each { |k,v|
-          u = User.find_by_access_key_id(k)
-          v.to_a.each { |g|
-            l << { :grantee_type => :user, :id => k, :display_name => u.display_name, :permission => g }
-          } if u
+          if k == User::ANONYMOUS_ID
+            v.to_a.each { |g|
+              l << { :grantee_type => :user, :id => k, :display_name => nil, :permission => g }
+            }
+          else
+            u = User.find_by_access_key_id(k)
+            v.to_a.each { |g|
+              l << { :grantee_type => :user, :id => k, :display_name => u.display_name, :permission => g }
+            } if u
+          end
         }
 
         get_acl['authenticated'].to_a.each { |g|
@@ -39,11 +47,11 @@ module S3Adapter
     end
 
     def readable? access_key_id
-      permitted?(access_key_id, WRITE) or permitted?(access_key_id, FULL_CONTROL)
+      permitted?(access_key_id, READ) or permitted?(access_key_id, FULL_CONTROL)
     end
 
     def writable? access_key_id
-      permitted?(access_key_id, READ) or permitted?(access_key_id, FULL_CONTROLL)
+      permitted?(access_key_id, WRITE) or permitted?(access_key_id, FULL_CONTROL)
     end
 
     def acp_readable? access_key_id
@@ -59,7 +67,8 @@ module S3Adapter
 
       (get_acl['guest'].to_a.include?(permission)) or
       (access_key_id and get_acl['authenticated'].to_a.include?(permission)) or
-      (access_key_id and (get_acl['account'] || {})[access_key_id].to_a.include?(permission))
+      (access_key_id and (get_acl['account'] || {})[access_key_id].to_a.include?(permission)) or
+      (access_key_id.nil? and (get_acl['account'] || {})[User::ANONYMOUS_ID].to_a.include?(permission))
     end
   end
 end

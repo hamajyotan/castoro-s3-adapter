@@ -19,6 +19,10 @@ module S3Adapter::Acl
       writable? access_key_id
     end
 
+    def put_object_copy? access_key_id
+      writable? access_key_id
+    end
+
     def delete_object? access_key_id
       writable? access_key_id
     end

@@ -47,7 +47,9 @@ command_line { |opt|
   opt.on('--head-x-amz-acl [HEAD]', 'PUT Object header x-amz-acl') { |v|
     options['headers']['x-amz-acl'] = v
   }
-  # TODO: implement metadata options.
+  opt.on('--head-x-amz-meta [HEAD]', 'PUT Object header x-amz-meta-*') { |v|
+    options['headers']['x-amz-meta'] = v
+  }
   opt.on('--head-x-amz-storage-class [HEAD]', 'PUT Object header x-amz-storage-class') { |v|
     options['headers']['x-amz-storage-class'] = v
   }
@@ -77,6 +79,13 @@ http_class.start(options['address'], options['port']) { |http|
     uri << '?' << options['parameters'].map { |k,v| "#{k}=#{v}" }.join('&')
   end
   headers = options['headers']
+  if headers['x-amz-meta']
+    headers['x-amz-meta'].split(',').each { |meta|
+      k,v = meta.split('=', 2)
+      headers["x-amz-meta-#{k.downcase}"] = v
+    }
+    headers.delete('x-amz-meta')
+  end
   if options['auth'] and not options['anonymous']
     headers['Authorization'] = authorization_header 'PUT', uri, headers, options['auth']
   end

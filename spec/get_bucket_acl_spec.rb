@@ -635,5 +635,4 @@ describe 'GET Bucket acl' do
     end
 
   end
-
 end
